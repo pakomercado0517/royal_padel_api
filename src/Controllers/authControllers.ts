@@ -7,184 +7,285 @@ import {
   sendPassworsResetToken,
 } from "../Emails/authEmails";
 import { generateJWT } from "../Utils/jwt";
+
 const { User } = db;
 
 export const createAccount = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
   try {
-    const user = await User.findOne({ where: { email } });
+    const { fullName, email, password } = req.body as {
+      fullName: string;
+      email: string;
+      password: string;
+    };
 
-    if (user) {
-      const error = new Error("El email ya está registrado");
-      res.status(409).json({ error: error.message });
+    if (!fullName?.trim() || !email?.trim() || !password?.trim()) {
+      return res
+        .status(400)
+        .json({ error: "fullName, email y password son requeridos." });
     }
 
-    const newUser = await User.create(req.body);
-    newUser.password_hash = await hashPassword(password);
+    const normEmail = email.trim().toLowerCase();
+    const exists = await User.findOne({ where: { email: normEmail } });
+    if (exists) {
+      return res.status(409).json({ error: "El email ya está registrado" });
+    }
+
+    const password_hash = await hashPassword(password);
     const token = generateToken();
-    newUser.token = token;
 
-    if (process.env.NODE_ENV === "production")
-      globalThis.royalPadelConfirmationToken = token;
-
-    await newUser.save();
-    // await sendConfirmationEmail({
-    //   name: newUser.name,
-    //   email: newUser.email,
-    //   token,
-    // });
-
-    res.status(201).json({
-      message:
-        "Usuario creado corretamente, por favor revisa tu correo para confirmar tu cuenta",
+    const newUser = await User.create({
+      fullName: fullName.trim(),
+      email: normEmail,
+      password_hash,
+      isActive: false,
+      role: "customer",
+      token,
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+
+    if (process.env.NODE_ENV === "production") {
+      (globalThis as any).royalPadelConfirmationToken = token;
+    }
+
+    await sendConfirmationEmail({
+      name: newUser.fullName,
+      email: newUser.email,
+      token,
+    });
+
+    return res.status(201).json({
+      message:
+        "Usuario creado correctamente, revisa tu correo para confirmar tu cuenta.",
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
 
 export const confirmAccount = async (req: Request, res: Response) => {
   try {
-    const { token } = req.body;
+    const { token } = req.body as { token: string };
     const user = await User.findOne({ where: { token } });
 
     if (!user) {
-      const error = new Error("El token es incorrecto");
-      res.status(401).json({ error: error.message });
-      return;
+      return res.status(401).json({ error: "El token es incorrecto" });
     }
 
     user.isActive = true;
-    user.token = null; //borramos el token por seguridad
+    user.token = null; // borrar token por seguridad
     await user.save();
 
-    res.status(200).json({
-      message: "Usuario confirmado con éxito, ya puedes iniciar sesión 👌🏻",
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res
+      .status(200)
+      .json({
+        message: "Usuario confirmado con éxito, ya puedes iniciar sesión 👌🏻",
+      });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ where: { email } });
+    const { email, password } = req.body as { email: string; password: string };
+    const normEmail = email?.trim().toLowerCase();
+
+    const user = normEmail
+      ? await User.findOne({ where: { email: normEmail } })
+      : null;
 
     if (!user) {
-      const error = new Error(
-        "Email no registrado en el sistema, verifícalo 😔"
-      );
-      res.status(403).json({ error: error.message });
-      return;
+      return res.status(403).json({
+        error: "Email no registrado en el sistema, verifícalo 😔",
+      });
     }
 
     if (!user.isActive) {
-      const error = new Error(
-        "Necesitas confirmar tu cuenta para poder iniciar sesión "
-      );
-      res.status(403).json({ error: error.message });
-      return;
+      return res.status(403).json({
+        error: "Necesitas confirmar tu cuenta para poder iniciar sesión",
+      });
     }
 
     const isValidPassword = await comparePassword(password, user.password_hash);
-
     if (!isValidPassword) {
-      const error = new Error("La contraseña es incorrecta ❌");
-      res.status(401).json({ error: error.message });
-      return;
+      return res.status(401).json({ error: "La contraseña es incorrecta ❌" });
     }
 
     const jwtToken = generateJWT(user.id);
 
-    if (process.env.NODE_ENV === "production")
-      globalThis.royalPadelJWT = jwtToken;
+    if (process.env.NODE_ENV === "production") {
+      (globalThis as any).royalPadelJWT = jwtToken;
+    }
 
-    res
+    return res
       .status(200)
-      .json({ message: "Haz iniciado sesión correctamente ✌🏻", jwtToken });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+      .json({ message: "Has iniciado sesión correctamente ✌🏻", jwtToken });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
-    const { email } = req.body;
-    const user = await User.findOne({ where: { email } });
+    const { email } = req.body as { email: string };
+    const normEmail = email?.trim().toLowerCase();
 
-    if (!email) {
-      const error = new Error(
-        "Email incorreocto o no esta registrado en el sistema ⚠"
-      );
-      res.status(404).json({ error: error.message });
-      return;
+    const user = normEmail
+      ? await User.findOne({ where: { email: normEmail } })
+      : null;
+
+    if (!user) {
+      return res.status(404).json({
+        error: "Email incorrecto o no está registrado en el sistema ⚠",
+      });
     }
 
     user.token = generateToken();
     await user.save();
+
     await sendPassworsResetToken({
       name: user.fullName,
       email: user.email,
-      token: user.token,
+      token: user.token!,
     });
 
-    res
+    return res
       .status(200)
-      .json({ message: "Revisa tu email para reestablecer la contraseña" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+      .json({ message: "Revisa tu email para restablecer la contraseña" });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
 
 export const validateToken = async (req: Request, res: Response) => {
   try {
-    const { token } = req.body;
+    const { token } = req.body as { token: string };
     const tokenExist = await User.findOne({ where: { token } });
 
     if (!tokenExist) {
-      const error = new Error("Token incorrecto, verifícalo");
-      res.status(403).json({ error: error.message });
-      return;
+      return res.status(403).json({ error: "Token incorrecto, verifícalo" });
     }
 
-    res
-      .status(200)
-      .json({ message: "Token correcto, ahora puedes cambiar la contraseña" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    return res.status(200).json({
+      message: "Token correcto, ahora puedes cambiar la contraseña",
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
 
 export const resetPasswordWithToken = async (req: Request, res: Response) => {
-  const { token } = req.params;
-  const { password } = req.body;
   try {
-    const user = await User.findOne({ where: { token } });
+    const { token } = req.params as { token: string };
+    const { password } = req.body as { password: string };
 
+    const user = await User.findOne({ where: { token } });
     if (!user) {
-      const error = new Error("Token inválido, verifícalo");
-      res.status(404).json({ error: error.message });
-      return;
+      return res.status(404).json({ error: "Token inválido, verifícalo" });
     }
 
     user.password_hash = await hashPassword(password);
     user.token = null;
     await user.save();
 
-    res
+    return res
       .status(200)
-      .json({ message: "Haz reestablecido tu contraseña exitosamente ✅" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+      .json({ message: "Has restablecido tu contraseña exitosamente ✅" });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
 
 export const updateCurrentPassword = async (req: Request, res: Response) => {
   try {
-    const { current_password, newPassword } = req.body;
-    const user = await User.findByPk();
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword: string;
+      newPassword: string;
+    };
+
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const ok = await comparePassword(currentPassword, user.password_hash);
+    if (!ok) {
+      return res
+        .status(401)
+        .json({ error: "La contraseña actual es incorrecta" });
+    }
+
+    user.password_hash = await hashPassword(newPassword);
+    await user.save();
+
+    return res.status(200).json({ message: "Contraseña actualizada" });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
+  }
+};
+
+export const checkPassword = async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const { password } = req.body as { password: string };
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const isPasswordCorrect = await comparePassword(
+      password,
+      user.password_hash
+    );
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ error: "La contraseña es incorrecta 😞" });
+    }
+
+    return res.status(200).json({ message: "Contraseña correcta" });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
+  }
+};
+
+export const updateUserData = async (req: Request, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return res.status(401).json({ error: "No autenticado" });
+    }
+
+    const { fullName, email } = req.body as {
+      fullName?: string;
+      email?: string;
+    };
+    const normEmail = email?.trim().toLowerCase();
+
+    if (normEmail) {
+      const verifyNewEmail = await User.findOne({
+        where: { email: normEmail },
+      });
+      if (verifyNewEmail && verifyNewEmail.id !== req.user.id) {
+        return res
+          .status(409)
+          .json({ error: "El email pertenece a otro usuario" });
+      }
+    }
+
+    await User.update(
+      {
+        ...(fullName ? { fullName: fullName.trim() } : {}),
+        ...(normEmail ? { email: normEmail } : {}),
+      },
+      { where: { id: req.user.id } }
+    );
+
+    return res.status(200).json({ message: "Información actualizada 👍🏻" });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };

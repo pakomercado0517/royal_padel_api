@@ -49,6 +49,7 @@ npm start
 El sistema implementa una arquitectura robusta con los siguientes modelos:
 
 ### 👤 User
+
 - Gestión de usuarios y autenticación
 - Roles: admin, staff, customer
 - Atributos principales: fullName, email, phone, password_hash
@@ -56,18 +57,21 @@ El sistema implementa una arquitectura robusta con los siguientes modelos:
 - Estado de activación de cuenta
 
 ### 👥 Customer
+
 - Información detallada de clientes
 - Vinculación opcional con usuario del sistema
 - Gestión de datos de contacto
 - Historial de reservaciones
 
 ### 🏸 Court (Cancha)
+
 - Gestión de canchas disponibles
 - Control de estado activo/inactivo
 - Tipo de superficie
 - Historial de reservaciones
 
 ### 📅 Reservation
+
 - Sistema completo de reservaciones
 - Estados: pending, confirmed, cancelled, no_show, completed
 - Vinculación con cancha y cliente
@@ -77,6 +81,7 @@ El sistema implementa una arquitectura robusta con los siguientes modelos:
 - Sistema de precios en centavos
 
 ### 💰 Payment
+
 - Registro completo de pagos
 - Métodos: cash, card, transfer, online
 - Estados: pending, paid, refunded, failed
@@ -88,25 +93,29 @@ El sistema implementa una arquitectura robusta con los siguientes modelos:
 
 ### 🔐 Autenticación (/user)
 
-| Método | Ruta | Descripción | Payload Requerido |
-|--------|------|-------------|-------------------|
-| POST | /create_account | Crear cuenta | fullName, email, password, phone(opcional) |
-| POST | /confirm_account | Confirmar cuenta | token(6 dígitos) |
-| POST | /login | Iniciar sesión | email, password |
-| POST | /forgot_password | Recuperar contraseña | email |
-| POST | /validate_token | Validar token | token(6 dígitos) |
-| POST | /reset_password/:token | Cambiar contraseña | password, token(param) |
+| Método | Ruta                   | Descripción          | Payload Requerido                          |
+| ------ | ---------------------- | -------------------- | ------------------------------------------ |
+| POST   | /create_account        | Crear cuenta         | fullName, email, password, phone(opcional) |
+| POST   | /confirm_account       | Confirmar cuenta     | token(6 dígitos)                           |
+| POST   | /login                 | Iniciar sesión       | email, password                            |
+| POST   | /forgot_password       | Recuperar contraseña | email                                      |
+| POST   | /validate_token        | Validar token        | token(6 dígitos)                           |
+| POST   | /reset_password/:token | Cambiar contraseña   | password, token(param)                     |
 
 ### 🔒 Seguridad
+
 Todas las rutas (excepto autenticación) requieren token JWT:
+
 ```http
 Authorization: Bearer <token>
 ```
 
 ### 📨 Respuestas
+
 Formato estándar de respuestas:
 
 ✅ Éxito:
+
 ```json
 {
   "message": "Mensaje de éxito",
@@ -115,6 +124,7 @@ Formato estándar de respuestas:
 ```
 
 ❌ Error:
+
 ```json
 {
   "error": "Mensaje de error"
@@ -148,6 +158,7 @@ Se envían emails automáticos para:
 - Reset de contraseña
 
 Los templates incluyen:
+
 - Diseño responsive
 - Soporte para modo oscuro
 - Códigos de verificación de 6 dígitos
@@ -159,30 +170,35 @@ Los templates incluyen:
 ### Próximas Funcionalidades
 
 #### 🏸 Gestión de Canchas
+
 - CRUD completo de canchas
 - Gestión de disponibilidad
 - Horarios especiales
 - Mantenimientos programados
 
 #### 📅 Sistema de Reservas
+
 - Reservas recurrentes
 - Cancelaciones automáticas
 - Lista de espera
 - Notificaciones en tiempo real
 
 #### 💳 Procesamiento de Pagos
+
 - Integración con pasarelas de pago
 - Facturación automática
 - Reportes financieros
 - Gestión de reembolsos
 
 #### ⚙️ Panel de Administración
+
 - Dashboard con métricas
 - Gestión de roles y permisos
 - Reportes personalizados
 - Configuración del sistema
 
 ## 📊 Base de Datos
+
 ```mermaid
 erDiagram
     User ||--o{ Customer : has
@@ -193,6 +209,7 @@ erDiagram
 ```
 
 ## 🔄 Estado del Proyecto
+
 - ✅ Sistema de autenticación
 - ✅ Gestión de usuarios
 - ✅ Emails transaccionales
@@ -201,4 +218,5 @@ erDiagram
 - 🏗️ Procesamiento de pagos
 
 ---
+
 Desarrollado por [Francisco Mercado](https://github.com/pakomercado0517) 🚀

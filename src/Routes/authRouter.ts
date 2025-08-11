@@ -2,72 +2,133 @@ import { Router } from "express";
 import { body, param } from "express-validator";
 import handleInputErrors from "../Middleware/validation";
 import * as authControllers from "../Controllers/authControllers";
+import { authenticate } from "../Middleware/auth";
 
 const router = Router();
 
-//POST Methods
+// POST /create_account
 router.post(
   "/create_account",
-  body("fullName").notEmpty().withMessage("Nombre Completo es requerido"),
-  body("email").isEmail().withMessage("Email debe ser válido"),
+  body("fullName")
+    .trim()
+    .notEmpty()
+    .withMessage("Nombre Completo es requerido"),
+  body("email").isEmail().normalizeEmail().withMessage("Email debe ser válido"),
   body("password")
-    .isLength({ min: 6 })
-    .withMessage("La contraseña debe tener al menos 6 caracteres"),
+    .isLength({ min: 8 })
+    .withMessage("La contraseña debe tener al menos 8 caracteres"),
+  // Si deseas permitir role aquí, valida contra tu enum real y protege con auth.
+  // body("role").optional().isIn(["customer", "staff", "admin"]).withMessage("Rol inválido"),
   body("phone")
     .optional()
     .isMobilePhone("es-MX")
     .withMessage("Teléfono debe ser un número válido"),
-  body("role")
-    .optional()
-    .isIn(["admin", "user"])
-    .withMessage("Rol debe ser 'admin' o 'user'"),
   handleInputErrors,
   authControllers.createAccount
 );
 
+// POST /confirm_account
 router.post(
   "/confirm_account",
-  body("token").isLength({ min: 6, max: 6 }).withMessage("Token inválido"),
+  body("token")
+    .isLength({ min: 6, max: 6 })
+    .isNumeric()
+    .withMessage("Token inválido"),
   handleInputErrors,
   authControllers.confirmAccount
 );
 
+// POST /login
 router.post(
   "/login",
-  body("email").isEmail().withMessage("Email no válido"),
+  body("email").isEmail().normalizeEmail().withMessage("Email no válido"),
   body("password").notEmpty().withMessage("La contraseña es obligatoria"),
   handleInputErrors,
   authControllers.login
 );
 
+// POST /forgot_password
 router.post(
   "/forgot_password",
-  body("email").isEmail().withMessage("Email no válido"),
+  body("email").isEmail().normalizeEmail().withMessage("Email no válido"),
   handleInputErrors,
   authControllers.forgotPassword
 );
 
+// POST /validate_token
 router.post(
   "/validate_token",
   body("token")
-    .notEmpty()
     .isLength({ min: 6, max: 6 })
+    .isNumeric()
     .withMessage("Token no válido"),
   handleInputErrors,
   authControllers.validateToken
 );
 
+// POST /reset_password/:token
 router.post(
   "/reset_password/:token",
   param("token")
-    .notEmpty()
     .isLength({ min: 6, max: 6 })
+    .isNumeric()
     .withMessage("Token no válido"),
   body("password")
     .isLength({ min: 8 })
     .withMessage("El password es corto, mínimo es de 8 caracteres"),
   handleInputErrors,
   authControllers.resetPasswordWithToken
+);
+
+// POST /update_password
+router.post(
+  "/update_password",
+  authenticate,
+  body("currentPassword")
+    .notEmpty()
+    .withMessage("La contraseña actual no puede ir vacía"),
+  body("newPassword")
+    .isLength({ min: 8 })
+    .withMessage("La nueva contraseña debe tener al menos 8 caracteres")
+    .custom((value, { req }) => {
+      if (value === req.body.currentPassword) {
+        throw new Error("La nueva contraseña debe ser diferente a la actual");
+      }
+      return true;
+    }),
+  handleInputErrors,
+  authControllers.updateCurrentPassword
+);
+
+// POST /check_password
+router.post(
+  "/check_password",
+  authenticate,
+  body("password").notEmpty().withMessage("La contraseña no puede ir vacía"),
+  handleInputErrors,
+  authControllers.checkPassword
+);
+
+// PUT / (update user data)
+router.put(
+  "/",
+  authenticate,
+  body("fullName")
+    .optional()
+    .trim()
+    .notEmpty()
+    .withMessage("Nombre Completo es requerido"),
+  body("email")
+    .optional()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Email debe ser válido"),
+  body("phone")
+    .optional()
+    .isMobilePhone("es-MX")
+    .withMessage("Teléfono debe ser válido"),
+  handleInputErrors,
+  authControllers.updateUserData
 );
 
 export default router;

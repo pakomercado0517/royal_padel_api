@@ -9,46 +9,34 @@ const includeBasics = [
   {
     model: User,
     attributes: ["id", "fullName", "email", "phone", "role", "isActive"],
+    required: true,
   },
 ];
 
 // ====== Create ======
 /**
  * POST /customers
- * body: { fullName, email?, phone?, notes?, userId? }
+ * body: { userId:number, notes?:string }
  */
 export const createCustomer = async (req: Request, res: Response) => {
   try {
-    const { fullName, email, phone, notes, userId } = req.body;
+    const { userId, notes } = req.body as { userId: number; notes?: string };
 
-    if (!fullName?.trim()) {
-      return res.status(400).json({ error: "fullName es requerido." });
-    }
+    if (!userId) return res.status(400).json({ error: "userId es requerido." });
 
-    let linkUserId: number | null = null;
-    if (userId != null) {
-      const user = await User.findByPk(Number(userId));
-      if (!user) return res.status(404).json({ error: "User no encontrado." });
-      linkUserId = user.id;
-    }
+    const user = await User.findByPk(Number(userId));
+    if (!user) return res.status(404).json({ error: "User no encontrado." });
 
-    // (Opcional) Unicidad por email si así lo decides
-    if (email) {
-      const exists = await Customer.findOne({ where: { email } });
-      if (exists)
-        return res
-          .status(409)
-          .json({ error: "Ese email ya está registrado en clientes." });
-    }
+    const exists = await Customer.findOne({ where: { userId: user.id } });
+    if (exists)
+      return res
+        .status(409)
+        .json({ error: "Ese usuario ya tiene un perfil de cliente." });
 
     const customer = await Customer.create({
-      fullName,
-      email: email ?? null,
-      phone: phone ?? null,
+      userId: user.id,
       notes: notes ?? null,
-      userId: linkUserId,
     });
-
     const withInclude = await Customer.findByPk(customer.id, {
       include: includeBasics,
     });
@@ -59,9 +47,6 @@ export const createCustomer = async (req: Request, res: Response) => {
 };
 
 // ====== Read one ======
-/**
- * GET /customers/:id
- */
 export const getCustomerById = async (
   req: Request<{ id: string }>,
   res: Response
@@ -73,7 +58,7 @@ export const getCustomerById = async (
     const customer = await Customer.findByPk(id, {
       include: [
         ...includeBasics,
-        { model: Reservation, order: [["startsAt", "DESC"]], limit: 20 }, // últimas 20 reservas
+        { model: Reservation, order: [["startsAt", "DESC"]], limit: 20 },
       ],
     });
     if (!customer)
@@ -85,31 +70,26 @@ export const getCustomerById = async (
   }
 };
 
-// ====== List (con filtros, búsqueda y paginación) ======
-/**
- * GET /customers
- * query: q? (busca en fullName/email/phone), page?, pageSize?
- */
+// ====== List (busca por campos del User) ======
 export const listCustomers = async (req: Request, res: Response) => {
   try {
     const {
       q,
       page = "1",
       pageSize = "20",
-    } = req.query as {
-      q?: string;
-      page?: string;
-      pageSize?: string;
-    };
+    } = req.query as { q?: string; page?: string; pageSize?: string };
 
     const where: any = {};
+    const include = [...includeBasics];
+
     if (q?.trim()) {
       const like = `%${q.trim()}%`;
       where[Op.or] = [
-        { fullName: { [Op.iLike]: like } },
-        { email: { [Op.iLike]: like } },
-        { phone: { [Op.iLike]: like } },
+        { "$user.fullName$": { [Op.iLike]: like } },
+        { "$user.email$": { [Op.iLike]: like } },
+        { "$user.phone$": { [Op.iLike]: like } },
       ];
+      include[0] = { ...(include[0] as any), required: true } as any;
     }
 
     const limit = Math.max(1, Math.min(100, Number(pageSize)));
@@ -117,8 +97,8 @@ export const listCustomers = async (req: Request, res: Response) => {
 
     const { rows, count } = await Customer.findAndCountAll({
       where,
-      include: includeBasics,
-      order: [["createdAt", "DESC"]],
+      include,
+      order: [[{ model: User, as: "user" }, "fullName", "ASC"]],
       limit,
       offset,
     });
@@ -136,10 +116,6 @@ export const listCustomers = async (req: Request, res: Response) => {
 };
 
 // ====== Update ======
-/**
- * PUT /customers/:id
- * body: { fullName?, email?, phone?, notes?, userId? }
- */
 export const updateCustomer = async (
   req: Request<{ id: string }>,
   res: Response
@@ -152,40 +128,25 @@ export const updateCustomer = async (
     if (!customer)
       return res.status(404).json({ error: "Cliente no encontrado" });
 
-    // Validar nuevo userId (si viene)
     if (req.body.userId !== undefined) {
-      if (req.body.userId === null) {
-        // desvincular
-        customer.userId = null as any;
-      } else {
-        const user = await User.findByPk(Number(req.body.userId));
-        if (!user)
-          return res
-            .status(404)
-            .json({ error: "User no encontrado para vincular." });
-        customer.userId = user.id as any;
-      }
-    }
+      const newUserId = Number(req.body.userId);
+      const user = await User.findByPk(newUserId);
+      if (!user)
+        return res
+          .status(404)
+          .json({ error: "User no encontrado para vincular." });
 
-    // Validar unicidad de email
-    if (req.body.email) {
-      const exists = await Customer.findOne({
-        where: { email: req.body.email },
-      });
-      if (exists && exists.id !== customer.id) {
+      const taken = await Customer.findOne({ where: { userId: newUserId } });
+      if (taken && taken.id !== customer.id) {
         return res
           .status(409)
-          .json({ error: "Ese email ya está usado por otro cliente." });
+          .json({ error: "Ese usuario ya tiene un perfil de cliente." });
       }
+      customer.userId = newUserId as any;
     }
 
-    await customer.update({
-      fullName: req.body.fullName ?? customer.fullName,
-      email: req.body.email ?? customer.email,
-      phone: req.body.phone ?? customer.phone,
-      notes: req.body.notes ?? customer.notes,
-      userId: customer.userId ?? null,
-    });
+    customer.notes = req.body.notes ?? customer.notes;
+    await customer.save();
 
     const updated = await Customer.findByPk(customer.id, {
       include: includeBasics,
@@ -197,10 +158,6 @@ export const updateCustomer = async (
 };
 
 // ====== Delete ======
-/**
- * DELETE /customers/:id
- * (opcional) impide borrar si tiene reservas activas
- */
 export const deleteCustomer = async (
   req: Request<{ id: string }>,
   res: Response
@@ -213,17 +170,16 @@ export const deleteCustomer = async (
     if (!customer)
       return res.status(404).json({ error: "Cliente no encontrado" });
 
-    // Checar reservas activas (pending/confirmed)
     const activeRes = await Reservation.count({
-      where: {
-        customerId: id,
-        status: { [Op.in]: ["pending", "confirmed"] },
-      },
+      where: { customerId: id, status: { [Op.in]: ["pending", "confirmed"] } },
     });
     if (activeRes > 0) {
-      return res.status(409).json({
-        error: "No se puede eliminar: el cliente tiene reservaciones activas.",
-      });
+      return res
+        .status(409)
+        .json({
+          error:
+            "No se puede eliminar: el cliente tiene reservaciones activas.",
+        });
     }
 
     await customer.destroy();
@@ -234,9 +190,6 @@ export const deleteCustomer = async (
 };
 
 // ====== Extra: listar reservas de un cliente ======
-/**
- * GET /customers/:id/reservations
- */
 export const listCustomerReservations = async (
   req: Request<{ id: string }>,
   res: Response
@@ -267,11 +220,7 @@ export const listCustomerReservations = async (
   }
 };
 
-// ====== Extra: vincular/desvincular user explícito ======
-/**
- * POST /customers/:id/link-user   body: { userId }
- * POST /customers/:id/unlink-user
- */
+// ====== Extra: vincular/desvincular user ======
 export const linkUser = async (req: Request<{ id: string }>, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -287,6 +236,13 @@ export const linkUser = async (req: Request<{ id: string }>, res: Response) => {
       return res.status(404).json({ error: "Cliente no encontrado" });
     if (!user) return res.status(404).json({ error: "User no encontrado" });
 
+    const taken = await Customer.findOne({ where: { userId: user.id } });
+    if (taken && taken.id !== customer.id) {
+      return res
+        .status(409)
+        .json({ error: "Ese usuario ya tiene un perfil de cliente." });
+    }
+
     await customer.update({ userId: user.id });
     const updated = await Customer.findByPk(customer.id, {
       include: includeBasics,
@@ -298,22 +254,16 @@ export const linkUser = async (req: Request<{ id: string }>, res: Response) => {
 };
 
 export const unlinkUser = async (
-  req: Request<{ id: string }>,
+  _req: Request<{ id: string }>,
   res: Response
 ) => {
   try {
-    const id = Number(req.params.id);
-    if (Number.isNaN(id)) return res.status(400).json({ error: "id inválido" });
-
-    const customer = await Customer.findByPk(id);
-    if (!customer)
-      return res.status(404).json({ error: "Cliente no encontrado" });
-
-    await customer.update({ userId: null });
-    const updated = await Customer.findByPk(customer.id, {
-      include: includeBasics,
-    });
-    return res.json(updated);
+    return res
+      .status(409)
+      .json({
+        error:
+          "No es posible desvincular: cada Customer debe tener un User asociado.",
+      });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message ?? "Error interno" });
   }

@@ -59,9 +59,10 @@ El sistema implementa una arquitectura robusta con los siguientes modelos:
 ### 👥 Customer
 
 - Información detallada de clientes
-- Vinculación opcional con usuario del sistema
-- Gestión de datos de contacto
+- Vinculación con usuario del sistema (userId requerido)
+- Notas adicionales (opcional)
 - Historial de reservaciones
+- Los datos personales (fullName, email, phone) se obtienen del User vinculado
 
 ### 🏸 Court (Cancha)
 

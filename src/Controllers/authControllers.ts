@@ -38,7 +38,6 @@ export const createAccount = async (req: Request, res: Response) => {
       email: normEmail,
       password_hash,
       isActive: false,
-      role: "customer",
       token,
     });
 
@@ -74,11 +73,9 @@ export const confirmAccount = async (req: Request, res: Response) => {
     user.token = null; // borrar token por seguridad
     await user.save();
 
-    return res
-      .status(200)
-      .json({
-        message: "Usuario confirmado con éxito, ya puedes iniciar sesión 👌🏻",
-      });
+    return res.status(200).json({
+      message: "Usuario confirmado con éxito, ya puedes iniciar sesión 👌🏻",
+    });
   } catch (error: any) {
     return res.status(500).json({ error: error.message ?? "Error interno" });
   }

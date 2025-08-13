@@ -11,7 +11,7 @@ import {
 import { Customer } from "./Customer";
 import { Reservation } from "./Reservation";
 
-export type UserRole = "admin" | "staff" | "customer";
+export type UserRole = "admin" | "staff";
 
 export interface UserAttributes {
   id: number;
@@ -22,6 +22,7 @@ export interface UserAttributes {
   isActive: boolean;
   role: UserRole;
   token: string | null;
+  token_expires_at: string | null;
 }
 
 export interface UserCreationAttributes
@@ -45,12 +46,15 @@ export class User extends Model<UserAttributes, UserCreationAttributes> {
   @Column(DataType.TEXT)
   declare password_hash: string | null;
 
+  @Column(DataType.DATE)
+  declare token_expires_at;
+
   @Default(false)
   @Column(DataType.BOOLEAN)
   declare isActive: boolean;
 
-  @Default("customer")
-  @Column(DataType.ENUM("admin", "customer"))
+  @Default("staff")
+  @Column(DataType.ENUM("admin", "staff"))
   declare role: UserRole;
 
   @Column(DataType.STRING(6))

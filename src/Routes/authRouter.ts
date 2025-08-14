@@ -27,6 +27,29 @@ router.post(
   authControllers.createAccount
 );
 
+//PUT /update_acount
+router.put(
+  "/:id/update_account",
+  body("fullName")
+    .trim()
+    .notEmpty()
+    .withMessage("Nombre completo es requerido"),
+  body("phone")
+    .optional()
+    .isMobilePhone("es-MX")
+    .withMessage("Teléfono debe ser un número válido"),
+  handleInputErrors,
+  authControllers.updateUser
+);
+
+//PUT /change_email
+router.put(
+  "/:id/change_email",
+  body("email").isEmail().normalizeEmail().withMessage("Email debe ser válido"),
+  handleInputErrors,
+  authControllers.changeEmail
+);
+
 // POST /confirm_account
 router.post(
   "/confirm_account",

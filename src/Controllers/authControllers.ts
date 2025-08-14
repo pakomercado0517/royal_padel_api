@@ -54,14 +54,14 @@ export const createAccount = async (req: Request, res: Response) => {
     });
 
     if (process.env.NODE_ENV === "production") {
+      await sendConfirmationEmail({
+        name: newUser.fullName,
+        email: newUser.email,
+        token,
+      });
+
       (globalThis as any).royalPadelConfirmationToken = token;
     }
-
-    // await sendConfirmationEmail({
-    //   name: newUser.fullName,
-    //   email: newUser.email,
-    //   token,
-    // });
 
     // Si el usuario tiene el rol de "customer" crearemos su perfil de cliente
     if (newUser.role === "customer") {
@@ -88,6 +88,81 @@ export const createAccount = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message ?? "Error interno" });
+  }
+};
+
+//* Importante, no cambiar el email aquí, para eso se hizo otra ruta donde se manda a confirmar el nuevo email
+export const updateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      const error = new Error("Usuario no encontrado");
+      res.status(404).json({ error: error.message });
+      return;
+    }
+
+    user.fullName = req.body;
+    user.phone = req.body;
+
+    if (req.body.role && req.body.role === "customer") {
+      user.role = req.body;
+    }
+
+    if (user.role === "customer") {
+      const customer = await Customer.findOne({ where: { userId: user.id } });
+      customer.notes = req.body;
+
+      res.status(201).json({ message: "Cliente actualizado con éxito" });
+      return;
+    }
+
+    res.status(201).json({ message: "Usuario actualizado con éxito" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const changeEmail = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      const error = new Error("Usuario no encontrado");
+      res.status(404).json({ error: error.message });
+      return;
+    }
+
+    if (req.body.email === user.email) {
+      const error = new Error(
+        "El email debe ser diferente al que ya tienes registrado"
+      );
+      res.status(406).json({ error: error.message });
+      return;
+    }
+
+    user.email = req.body.email;
+    user.isActive = false;
+    user.token = generateToken();
+    await user.save();
+
+    if (process.env.NODE_ENV === "production") {
+      await sendConfirmationEmail({
+        name: user.fullName,
+        email: user.email,
+        token: user.token,
+      });
+    }
+
+    res.status(200).json({
+      message:
+        "Email actualizado, es necesario que confirmes la cuenta desde tu bandeja de entrada para iniciar sesión de nuevo",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -170,11 +245,13 @@ export const forgotPassword = async (req: Request, res: Response) => {
     user.token = generateToken();
     await user.save();
 
-    await sendPassworsResetToken({
-      name: user.fullName,
-      email: user.email,
-      token: user.token!,
-    });
+    if (process.env.NODE_ENV === "production") {
+      await sendPassworsResetToken({
+        name: user.fullName,
+        email: user.email,
+        token: user.token!,
+      });
+    }
 
     return res
       .status(200)

@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import db from "../Config/db";
 import { comparePassword, hashPassword } from "../Utils/auth";
 import { generateToken } from "../Utils/token";
 import {
@@ -7,15 +6,27 @@ import {
   sendPassworsResetToken,
 } from "../Emails/authEmails";
 import { generateJWT } from "../Utils/jwt";
+import { User } from "../Models/User";
+import { Customer } from "../Models/Customer";
+import { UserRole } from "../Models/User";
 
-const { User } = db;
+// === === === Helpers === === ===
+const includeBasics = [
+  {
+    model: Customer,
+    attributes: ["id", "notes"],
+    required: true,
+  },
+];
 
 export const createAccount = async (req: Request, res: Response) => {
   try {
-    const { fullName, email, password } = req.body as {
+    const { fullName, email, password, phone, role } = req.body as {
       fullName: string;
       email: string;
       password: string;
+      phone: string;
+      role: UserRole;
     };
 
     if (!fullName?.trim() || !email?.trim() || !password?.trim()) {
@@ -37,19 +48,39 @@ export const createAccount = async (req: Request, res: Response) => {
       fullName: fullName.trim(),
       email: normEmail,
       password_hash,
-      isActive: false,
       token,
+      phone,
+      role,
     });
 
     if (process.env.NODE_ENV === "production") {
       (globalThis as any).royalPadelConfirmationToken = token;
     }
 
-    await sendConfirmationEmail({
-      name: newUser.fullName,
-      email: newUser.email,
-      token,
-    });
+    // await sendConfirmationEmail({
+    //   name: newUser.fullName,
+    //   email: newUser.email,
+    //   token,
+    // });
+
+    // Si el usuario tiene el rol de "customer" crearemos su perfil de cliente
+    if (newUser.role === "customer") {
+      const customer = await Customer.create({
+        userId: newUser.id,
+        notes: "", // notas vacías por defecto
+      });
+
+      const withInclude = await User.findByPk(newUser.id, {
+        include: includeBasics,
+      });
+
+      res.status(200).json({
+        message:
+          "Clente creado con éxito, verifica tu email para confirmar tu cuenta",
+        withInclude,
+      });
+      return;
+    }
 
     return res.status(201).json({
       message:

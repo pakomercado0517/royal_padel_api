@@ -72,7 +72,7 @@ export const sendConfirmationEmail = async (user: EmailTypes) => {
                         <!-- Button -->
                         <tr>
                           <td align="center" style="padding:18px 28px 0 28px;">
-                            <a href="${FRONTEND_URL}" class="btn" style="display:inline-block;text-decoration:none;background:#0ea5e9;border-radius:10px;padding:12px 20px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;font-size:15px;color:#ffffff;">
+                            <a href="${FRONTEND_URL}/auth/confirm-account?email=${user.email}" class="btn" style="display:inline-block;text-decoration:none;background:#0ea5e9;border-radius:10px;padding:12px 20px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;font-size:15px;color:#ffffff;">
                               Ir a confirmar mi cuenta
                             </a>
                           </td>
@@ -85,7 +85,7 @@ export const sendConfirmationEmail = async (user: EmailTypes) => {
                               Si el botón no funciona, copia y pega este enlace en tu navegador:
                             </p>
                             <p style="margin:6px 0 0 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;color:#0ea5e9;word-break:break-all;">
-                              <a href="${FRONTEND_URL}" style="color:#0ea5e9;text-decoration:underline;">${FRONTEND_URL}</a>
+                              <a href="${FRONTEND_URL}/auth/confirm-account?email=${user.email}" style="color:#0ea5e9;text-decoration:underline;">${FRONTEND_URL}/auth/confirm-account?email=${user.email}</a>
                             </p>
                           </td>
                         </tr>
@@ -186,7 +186,7 @@ export const sendPassworsResetToken = async (user: EmailTypes) => {
                         <!-- Button -->
                         <tr>
                           <td align="center" style="padding:18px 28px 0 28px;">
-                            <a href="${FRONTEND_URL}" class="btn" style="display:inline-block;text-decoration:none;background:#0ea5e9;border-radius:10px;padding:12px 20px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;font-size:15px;color:#ffffff;">
+                            <a href="${FRONTEND_URL}/auth/reset-password?email=${user.email}" class="btn" style="display:inline-block;text-decoration:none;background:#0ea5e9;border-radius:10px;padding:12px 20px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-weight:600;font-size:15px;color:#ffffff;">
                               Ir a restablecer contraseña
                             </a>
                           </td>
@@ -199,7 +199,7 @@ export const sendPassworsResetToken = async (user: EmailTypes) => {
                               Si el botón no funciona, copia y pega este enlace en tu navegador:
                             </p>
                             <p style="margin:6px 0 0 0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;color:#0ea5e9;word-break:break-all;">
-                              <a href="${FRONTEND_URL}" style="color:#0ea5e9;text-decoration:underline;">${FRONTEND_URL}</a>
+                              <a href="${FRONTEND_URL}/auth/reset-password?email=${user.email}" style="color:#0ea5e9;text-decoration:underline;">${FRONTEND_URL}/auth/reset-password?email=${user.email}</a>
                             </p>
                           </td>
                         </tr>

@@ -63,6 +63,8 @@ El sistema implementa una arquitectura robusta con los siguientes modelos:
 - Notas adicionales (opcional)
 - Historial de reservaciones
 - Los datos personales (fullName, email, phone) se obtienen del User vinculado
+- Se crea automáticamente al registrar un nuevo usuario con rol "customer" (rol por defecto)
+- La creación automática inicializa el campo notes como vacío
 
 ### 🏸 Court (Cancha)
 
@@ -94,14 +96,14 @@ El sistema implementa una arquitectura robusta con los siguientes modelos:
 
 ### 🔐 Autenticación (/user)
 
-| Método | Ruta                   | Descripción          | Payload Requerido                          |
-| ------ | ---------------------- | -------------------- | ------------------------------------------ |
-| POST   | /create_account        | Crear cuenta         | fullName, email, password, phone(opcional) |
-| POST   | /confirm_account       | Confirmar cuenta     | token(6 dígitos)                           |
-| POST   | /login                 | Iniciar sesión       | email, password                            |
-| POST   | /forgot_password       | Recuperar contraseña | email                                      |
-| POST   | /validate_token        | Validar token        | token(6 dígitos)                           |
-| POST   | /reset_password/:token | Cambiar contraseña   | password, token(param)                     |
+| Método | Ruta                   | Descripción                      | Payload Requerido                                                                                             |
+| ------ | ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| POST   | /create_account        | Crear cuenta y perfil de cliente | fullName, email, password, phone(opcional). Crea automáticamente el perfil de cliente si el rol es "customer" |
+| POST   | /confirm_account       | Confirmar cuenta                 | token(6 dígitos)                                                                                              |
+| POST   | /login                 | Iniciar sesión                   | email, password                                                                                               |
+| POST   | /forgot_password       | Recuperar contraseña             | email                                                                                                         |
+| POST   | /validate_token        | Validar token                    | token(6 dígitos)                                                                                              |
+| POST   | /reset_password/:token | Cambiar contraseña               | password, token(param)                                                                                        |
 
 ### 🔒 Seguridad
 

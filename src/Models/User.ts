@@ -11,7 +11,7 @@ import {
 import { Customer } from "./Customer";
 import { Reservation } from "./Reservation";
 
-export type UserRole = "admin" | "staff";
+export type UserRole = "admin" | "staff" | "customer";
 
 export interface UserAttributes {
   id: number;
@@ -53,8 +53,8 @@ export class User extends Model<UserAttributes, UserCreationAttributes> {
   @Column(DataType.BOOLEAN)
   declare isActive: boolean;
 
-  @Default("staff")
-  @Column(DataType.ENUM("admin", "staff"))
+  @Default("customer")
+  @Column(DataType.ENUM("admin", "staff", "customer"))
   declare role: UserRole;
 
   @Column(DataType.STRING(6))

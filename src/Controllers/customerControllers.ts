@@ -20,7 +20,8 @@ const includeBasics = [
  */
 export const createCustomer = async (req: Request, res: Response) => {
   try {
-    const { userId, notes } = req.body as { userId: number; notes?: string };
+    const { notes } = req.body as { notes?: string };
+    const userId = req.user;
 
     if (!userId) return res.status(400).json({ error: "userId es requerido." });
 
@@ -37,10 +38,12 @@ export const createCustomer = async (req: Request, res: Response) => {
       userId: user.id,
       notes: notes ?? null,
     });
-    const withInclude = await Customer.findByPk(customer.id, {
-      include: includeBasics,
-    });
-    return res.status(201).json(withInclude);
+    // const withInclude = await Customer.findByPk(customer.id, {
+    //   include: includeBasics,
+    // });
+    return res
+      .status(201)
+      .json({ message: "Datos de cliente creados con éxito" });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message ?? "Error interno" });
   }
@@ -174,12 +177,9 @@ export const deleteCustomer = async (
       where: { customerId: id, status: { [Op.in]: ["pending", "confirmed"] } },
     });
     if (activeRes > 0) {
-      return res
-        .status(409)
-        .json({
-          error:
-            "No se puede eliminar: el cliente tiene reservaciones activas.",
-        });
+      return res.status(409).json({
+        error: "No se puede eliminar: el cliente tiene reservaciones activas.",
+      });
     }
 
     await customer.destroy();
@@ -258,12 +258,10 @@ export const unlinkUser = async (
   res: Response
 ) => {
   try {
-    return res
-      .status(409)
-      .json({
-        error:
-          "No es posible desvincular: cada Customer debe tener un User asociado.",
-      });
+    return res.status(409).json({
+      error:
+        "No es posible desvincular: cada Customer debe tener un User asociado.",
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message ?? "Error interno" });
   }

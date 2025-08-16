@@ -14,9 +14,9 @@ import { Reservation } from "./Reservation";
 export interface CustomerAttributes {
   id: number;
   userId?: number | null;
-  fullName: string;
-  email?: string | null;
-  phone?: string | null;
+  // fullName: string;
+  // email?: string | null;
+  // phone?: string | null;
   notes?: string | null;
 }
 
@@ -32,15 +32,15 @@ export class Customer extends Model<
   @Column(DataType.BIGINT)
   declare userId: number | null;
 
-  @AllowNull(false)
-  @Column(DataType.STRING)
-  declare fullName: string;
+  // @AllowNull(false)
+  // @Column(DataType.STRING)
+  // declare fullName: string;
 
-  @Column(DataType.STRING)
-  declare email: string | null;
+  // @Column(DataType.STRING)
+  // declare email: string | null;
 
-  @Column(DataType.STRING)
-  declare phone: string | null;
+  // @Column(DataType.STRING)
+  // declare phone: string | null;
 
   @Column(DataType.TEXT)
   declare notes: string | null;

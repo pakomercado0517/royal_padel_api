@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import db from "../Config/db";
 import { comparePassword, hashPassword } from "../Utils/auth";
 import { generateToken } from "../Utils/token";
 import {
@@ -7,15 +6,27 @@ import {
   sendPassworsResetToken,
 } from "../Emails/authEmails";
 import { generateJWT } from "../Utils/jwt";
+import { User } from "../Models/User";
+import { Customer } from "../Models/Customer";
+import { UserRole } from "../Models/User";
 
-const { User } = db;
+// === === === Helpers === === ===
+const includeBasics = [
+  {
+    model: Customer,
+    attributes: ["id", "notes"],
+    required: true,
+  },
+];
 
 export const createAccount = async (req: Request, res: Response) => {
   try {
-    const { fullName, email, password } = req.body as {
+    const { fullName, email, password, phone, role } = req.body as {
       fullName: string;
       email: string;
       password: string;
+      phone: string;
+      role: UserRole;
     };
 
     if (!fullName?.trim() || !email?.trim() || !password?.trim()) {
@@ -37,19 +48,39 @@ export const createAccount = async (req: Request, res: Response) => {
       fullName: fullName.trim(),
       email: normEmail,
       password_hash,
-      isActive: false,
       token,
+      phone,
+      role,
     });
 
     if (process.env.NODE_ENV === "production") {
+      await sendConfirmationEmail({
+        name: newUser.fullName,
+        email: newUser.email,
+        token,
+      });
+
       (globalThis as any).royalPadelConfirmationToken = token;
     }
 
-    await sendConfirmationEmail({
-      name: newUser.fullName,
-      email: newUser.email,
-      token,
-    });
+    // Si el usuario tiene el rol de "customer" crearemos su perfil de cliente
+    if (newUser.role === "customer") {
+      const customer = await Customer.create({
+        userId: newUser.id,
+        notes: "", // notas vacías por defecto
+      });
+
+      const withInclude = await User.findByPk(newUser.id, {
+        include: includeBasics,
+      });
+
+      res.status(200).json({
+        message:
+          "Clente creado con éxito, verifica tu email para confirmar tu cuenta",
+        withInclude,
+      });
+      return;
+    }
 
     return res.status(201).json({
       message:
@@ -57,6 +88,81 @@ export const createAccount = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message ?? "Error interno" });
+  }
+};
+
+//* Importante, no cambiar el email aquí, para eso se hizo otra ruta donde se manda a confirmar el nuevo email
+export const updateUser = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  try {
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      const error = new Error("Usuario no encontrado");
+      res.status(404).json({ error: error.message });
+      return;
+    }
+
+    user.fullName = req.body;
+    user.phone = req.body;
+
+    if (req.body.role && req.body.role === "customer") {
+      user.role = req.body;
+    }
+
+    if (user.role === "customer") {
+      const customer = await Customer.findOne({ where: { userId: user.id } });
+      customer.notes = req.body;
+
+      res.status(201).json({ message: "Cliente actualizado con éxito" });
+      return;
+    }
+
+    res.status(201).json({ message: "Usuario actualizado con éxito" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+export const changeEmail = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      const error = new Error("Usuario no encontrado");
+      res.status(404).json({ error: error.message });
+      return;
+    }
+
+    if (req.body.email === user.email) {
+      const error = new Error(
+        "El email debe ser diferente al que ya tienes registrado"
+      );
+      res.status(406).json({ error: error.message });
+      return;
+    }
+
+    user.email = req.body.email;
+    user.isActive = false;
+    user.token = generateToken();
+    await user.save();
+
+    if (process.env.NODE_ENV === "production") {
+      await sendConfirmationEmail({
+        name: user.fullName,
+        email: user.email,
+        token: user.token,
+      });
+    }
+
+    res.status(200).json({
+      message:
+        "Email actualizado, es necesario que confirmes la cuenta desde tu bandeja de entrada para iniciar sesión de nuevo",
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };
 
@@ -74,7 +180,7 @@ export const confirmAccount = async (req: Request, res: Response) => {
     await user.save();
 
     return res.status(200).json({
-      message: "Usuario confirmado con éxito, ya puedes iniciar sesión 👌🏻",
+      message: "Código confirmado con éxito, ya puedes continuar 👌🏻",
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message ?? "Error interno" });
@@ -139,11 +245,13 @@ export const forgotPassword = async (req: Request, res: Response) => {
     user.token = generateToken();
     await user.save();
 
-    await sendPassworsResetToken({
-      name: user.fullName,
-      email: user.email,
-      token: user.token!,
-    });
+    if (process.env.NODE_ENV === "production") {
+      await sendPassworsResetToken({
+        name: user.fullName,
+        email: user.email,
+        token: user.token!,
+      });
+    }
 
     return res
       .status(200)

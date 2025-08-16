@@ -180,7 +180,7 @@ export const confirmAccount = async (req: Request, res: Response) => {
     await user.save();
 
     return res.status(200).json({
-      message: "Usuario confirmado con éxito, ya puedes iniciar sesión 👌🏻",
+      message: "Código confirmado con éxito, ya puedes continuar 👌🏻",
     });
   } catch (error: any) {
     return res.status(500).json({ error: error.message ?? "Error interno" });

@@ -32,17 +32,17 @@ server.use(
 const apiRouter = express.Router();
 
 // Mount all routes on the API router
-apiRouter.use('/user', authRouter);
-apiRouter.use('/court', courtRouter);
-apiRouter.use('/court-availability', courtAvailabilityRouter);
-apiRouter.use('/court-pricing', courtPricingRouter);
-apiRouter.use('/customer', customerRouter);
-apiRouter.use('/notifications', notificationRouter);
-apiRouter.use('/payment', paymentRouter);
-apiRouter.use('/reservation', reservationRouter);
+apiRouter.use("/user", authRouter);
+apiRouter.use("/court", courtRouter);
+apiRouter.use("/court-availability", courtAvailabilityRouter);
+apiRouter.use("/court-pricing", courtPricingRouter);
+// apiRouter.use('/customer', customerRouter);
+apiRouter.use("/notifications", notificationRouter);
+apiRouter.use("/payment", paymentRouter);
+apiRouter.use("/reservation", reservationRouter);
 
 // Apply the /api prefix to all routes at once
-server.use('/api', apiRouter);
+server.use("/api", apiRouter);
 
 //Error catching endware
 server.use((err: any, req: Request, res: Response, next: NextFunction) => {

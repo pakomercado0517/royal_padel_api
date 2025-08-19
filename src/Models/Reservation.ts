@@ -8,94 +8,126 @@ import {
   BelongsTo,
   ForeignKey,
   HasMany,
+  HasOne,
+  PrimaryKey,
+  Min,
 } from "sequelize-typescript";
 import { Court } from "./Court";
 import { Customer } from "./Customer";
 import { User } from "./User";
 import { Payment } from "./Payment";
+import { ReservationPlayer } from "./ReservationPlayer";
 
-export type ReservationStatus =
-  | "pending"
-  | "confirmed"
-  | "cancelled"
-  | "no_show"
-  | "completed";
+export type ReservationStatus = "pending" | "confirmed" | "completed" | "cancelled" | "no_show";
+export type PaymentStatus = "pending" | "paid" | "refunded" | "failed";
+export type BookingType = "individual" | "group" | "tournament";
 
 export interface ReservationAttributes {
-  id: number;
-  courtId: number;
-  customerId?: number | null;
-  bookedByUser?: number | null;
+  id: string; // UUID
+  userId: string;
+  courtId: string;
+  reservationDate: Date;
+  startTime: string; // TIME formato HH:mm
+  endTime: string; // TIME formato HH:mm
+  durationMinutes: number;
+  totalPrice: number; // DECIMAL
   status: ReservationStatus;
-  startsAt: Date;
-  endsAt: Date;
-  playersCount?: number | null;
-  priceCents: number;
-  currency: string;
-  notes?: string | null;
+  paymentStatus: PaymentStatus;
+  bookingType: BookingType;
+  specialRequests?: string | null;
+  cancellationReason?: string | null;
+  cancelledAt?: Date | null;
+  confirmedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ReservationCreationAttributes
-  extends Omit<ReservationAttributes, "id" | "status" | "currency"> {
+  extends Omit<ReservationAttributes, "id" | "status" | "paymentStatus" | "bookingType" | "createdAt" | "updatedAt"> {
   status?: ReservationStatus;
-  currency?: string;
+  paymentStatus?: PaymentStatus;
+  bookingType?: BookingType;
 }
 
-@Table({ tableName: "reservations", timestamps: true })
+@Table({ 
+  tableName: "reservations", 
+  timestamps: true,
+  underscored: true // snake_case en DB
+})
 export class Reservation extends Model<
   ReservationAttributes,
   ReservationCreationAttributes
 > {
-  @ForeignKey(() => Court)
-  @AllowNull(false)
-  @Column(DataType.BIGINT)
-  declare courtId: number;
-
-  @ForeignKey(() => Customer)
-  @Column(DataType.BIGINT)
-  declare customerId: number | null;
+  @PrimaryKey
+  @Default(DataType.UUIDV4)
+  @Column(DataType.UUID)
+  declare id: string;
 
   @ForeignKey(() => User)
-  @Column(DataType.BIGINT)
-  declare bookedByUser: number | null;
+  @AllowNull(false)
+  @Column(DataType.UUID)
+  declare userId: string;
+
+  @ForeignKey(() => Court)
+  @AllowNull(false)
+  @Column(DataType.UUID)
+  declare courtId: string;
+
+  @AllowNull(false)
+  @Column(DataType.DATE)
+  declare reservationDate: Date;
+
+  @AllowNull(false)
+  @Column(DataType.TIME)
+  declare startTime: string;
+
+  @AllowNull(false)
+  @Column(DataType.TIME)
+  declare endTime: string;
+
+  @AllowNull(false)
+  @Min(30)
+  @Column(DataType.INTEGER)
+  declare durationMinutes: number;
+
+  @AllowNull(false)
+  @Min(0)
+  @Column(DataType.DECIMAL(8, 2))
+  declare totalPrice: number;
 
   @Default("pending")
-  @Column(
-    DataType.ENUM("pending", "confirmed", "cancelled", "no_show", "completed")
-  )
+  @Column(DataType.ENUM("pending", "confirmed", "completed", "cancelled", "no_show"))
   declare status: ReservationStatus;
 
-  @AllowNull(false)
-  @Column(DataType.DATE)
-  declare startsAt: Date;
+  @Default("pending")
+  @Column(DataType.ENUM("pending", "paid", "refunded", "failed"))
+  declare paymentStatus: PaymentStatus;
 
-  @AllowNull(false)
-  @Column(DataType.DATE)
-  declare endsAt: Date;
-
-  @Column(DataType.INTEGER)
-  declare playersCount: number | null;
-
-  @AllowNull(false)
-  @Column(DataType.INTEGER)
-  declare priceCents: number;
-
-  @Default("MXN")
-  @Column(DataType.STRING)
-  declare currency: string;
+  @Default("individual")
+  @Column(DataType.ENUM("individual", "group", "tournament"))
+  declare bookingType: BookingType;
 
   @Column(DataType.TEXT)
-  declare notes: string | null;
+  declare specialRequests: string | null;
 
-  @BelongsTo(() => Court)
+  @Column(DataType.TEXT)
+  declare cancellationReason: string | null;
+
+  @Column(DataType.DATE)
+  declare cancelledAt: Date | null;
+
+  @Column(DataType.DATE)
+  declare confirmedAt: Date | null;
+
+  @BelongsTo(() => User, { foreignKey: "userId", as: "user" })
+  declare user?: User;
+
+  @BelongsTo(() => Court, { foreignKey: "courtId", as: "court" })
   declare court?: Court;
 
-  @BelongsTo(() => Customer)
-  declare customer?: Customer;
+  @HasOne(() => Payment, { foreignKey: "reservationId", as: "payment" })
+  declare payment?: Payment;
 
-  @BelongsTo(() => User, { foreignKey: "bookedByUser", targetKey: "id" })
-  declare bookedBy?: User;
-
-  @HasMany(() => Payment, { foreignKey: "reservationId" })
-  declare payments?: Payment[];
+  @HasMany(() => ReservationPlayer, { foreignKey: "reservationId", as: "players" })
+  declare players?: ReservationPlayer[];
 }

@@ -7,64 +7,128 @@ import {
   AllowNull,
   HasOne,
   HasMany,
+  PrimaryKey,
+  Unique,
+  IsEmail,
+  IsUrl,
 } from "sequelize-typescript";
 import { Customer } from "./Customer";
 import { Reservation } from "./Reservation";
+import { AuthToken } from "./AuthToken";
+import { UserStats } from "./UserStats";
+import { UserAchievement } from "./UserAchievement";
+import { Notification } from "./Notification";
+import { Payment } from "./Payment";
+import { ReservationPlayer } from "./ReservationPlayer";
 
+export type UserStatus = "active" | "inactive" | "suspended";
 export type UserRole = "admin" | "staff" | "customer";
 
 export interface UserAttributes {
-  id: number;
+  id: string; // UUID
+  email: string;
+  passwordHash: string;
   fullName: string;
-  email?: string | null;
   phone?: string | null;
-  password_hash?: string | null;
-  isActive: boolean;
+  avatarUrl?: string | null;
+  dateOfBirth?: Date | null;
+  status: UserStatus;
   role: UserRole;
-  token: string | null;
-  token_expires_at: string | null;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  preferences: object;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
 }
 
 export interface UserCreationAttributes
-  extends Omit<UserAttributes, "id" | "isActive" | "role"> {
-  isActive?: boolean;
+  extends Omit<UserAttributes, "id" | "status" | "role" | "emailVerified" | "phoneVerified" | "createdAt" | "updatedAt"> {
+  status?: UserStatus;
   role?: UserRole;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
 }
 
-@Table({ tableName: "users", timestamps: true })
+@Table({ 
+  tableName: "users", 
+  timestamps: true, 
+  paranoid: true, // soft delete
+  underscored: true // snake_case en DB
+})
 export class User extends Model<UserAttributes, UserCreationAttributes> {
+  @PrimaryKey
+  @Default(DataType.UUIDV4)
+  @Column(DataType.UUID)
+  declare id: string;
+
+  @AllowNull(false)
+  @Unique
+  @IsEmail
+  @Column(DataType.STRING)
+  declare email: string;
+
   @AllowNull(false)
   @Column(DataType.STRING)
-  declare fullName: string;
+  declare passwordHash: string;
 
-  @Column(DataType.STRING)
-  declare email: string | null;
+  @AllowNull(false)
+  @Column(DataType.STRING(100))
+  declare fullName: string;
 
   @Column(DataType.STRING)
   declare phone: string | null;
 
-  @Column(DataType.TEXT)
-  declare password_hash: string | null;
+  @IsUrl
+  @Column(DataType.STRING)
+  declare avatarUrl: string | null;
 
   @Column(DataType.DATE)
-  declare token_expires_at;
+  declare dateOfBirth: Date | null;
 
-  @Default(false)
-  @Column(DataType.BOOLEAN)
-  declare isActive: boolean;
+  @Default("active")
+  @Column(DataType.ENUM("active", "inactive", "suspended"))
+  declare status: UserStatus;
 
   @Default("customer")
   @Column(DataType.ENUM("admin", "staff", "customer"))
   declare role: UserRole;
 
-  @Column(DataType.STRING(6))
-  declare token: string | null;
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare emailVerified: boolean;
 
-  // Relacion 1:1 con Customer
+  @Default(false)
+  @Column(DataType.BOOLEAN)
+  declare phoneVerified: boolean;
+
+  @Default({})
+  @Column(DataType.JSON)
+  declare preferences: object;
+
+  // User relationships según especificaciones
+  @HasMany(() => Reservation, { foreignKey: "userId", as: "reservations" })
+  declare reservations?: Reservation[];
+
+  @HasMany(() => AuthToken, { foreignKey: "userId", as: "tokens" })
+  declare tokens?: AuthToken[];
+
+  @HasOne(() => UserStats, { foreignKey: "userId", as: "stats" })
+  declare stats?: UserStats;
+
+  @HasMany(() => UserAchievement, { foreignKey: "userId", as: "achievements" })
+  declare achievements?: UserAchievement[];
+
+  @HasMany(() => Notification, { foreignKey: "userId", as: "notifications" })
+  declare notifications?: Notification[];
+
+  @HasMany(() => Payment, { foreignKey: "userId", as: "payments" })
+  declare payments?: Payment[];
+
+  @HasMany(() => ReservationPlayer, { foreignKey: "userId", as: "playerReservations" })
+  declare playerReservations?: ReservationPlayer[];
+
+  // Relacion 1:1 con Customer (legacy - mantener para compatibilidad)
   @HasOne(() => Customer, { foreignKey: "userId" })
   declare customer?: Customer;
-
-  // Quien registró una reserva (staff o él mismo)
-  @HasMany(() => Reservation, { foreignKey: "bookedByUser" })
-  declare reservationsBooked?: Reservation[];
 }

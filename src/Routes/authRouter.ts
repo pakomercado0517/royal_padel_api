@@ -11,18 +11,25 @@ router.post(
   "/create_account",
   body("fullName")
     .trim()
-    .notEmpty()
-    .withMessage("Nombre Completo es requerido"),
-  body("email").isEmail().normalizeEmail().withMessage("Email debe ser válido"),
+    .isLength({ min: 2, max: 100 })
+    .withMessage("Nombre Completo debe tener entre 2 y 100 caracteres"),
+  body("email")
+    .isEmail()
+    .normalizeEmail()
+    .withMessage("Email debe ser válido"),
   body("password")
     .isLength({ min: 8 })
-    .withMessage("La contraseña debe tener al menos 8 caracteres"),
-  // Si deseas permitir role aquí, valida contra tu enum real y protege con auth.
-  // body("role").optional().isIn(["customer", "staff", "admin"]).withMessage("Rol inválido"),
+    .withMessage("La contraseña debe tener al menos 8 caracteres")
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage("La contraseña debe contener al menos una minúscula, una mayúscula y un número"),
   body("phone")
     .optional()
     .isMobilePhone("es-MX")
     .withMessage("Teléfono debe ser un número válido"),
+  body("role")
+    .optional()
+    .isIn(["customer", "staff", "admin"])
+    .withMessage("Rol debe ser customer, staff o admin"),
   handleInputErrors,
   authControllers.createAccount
 );
@@ -152,6 +159,48 @@ router.put(
     .withMessage("Teléfono debe ser válido"),
   handleInputErrors,
   authControllers.updateUserData
+);
+
+// GET /profile (obtener perfil del usuario autenticado)
+router.get(
+  "/profile",
+  authenticate,
+  async (req, res) => {
+    try {
+      const user = req.user;
+      const userProfile = {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified
+      };
+      
+      res.json({
+        message: "Perfil obtenido exitosamente",
+        user: userProfile
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message ?? "Error interno" });
+    }
+  }
+);
+
+// POST /resend_verification (reenviar email de verificación)
+router.post(
+  "/resend_verification",
+  body("email").isEmail().normalizeEmail().withMessage("Email debe ser válido"),
+  handleInputErrors,
+  async (req, res) => {
+    try {
+      // Este endpoint se puede implementar más tarde
+      res.status(501).json({ message: "Funcionalidad por implementar" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message ?? "Error interno" });
+    }
+  }
 );
 
 export default router;

@@ -6,9 +6,11 @@ import {
   sendPassworsResetToken,
 } from "../Emails/authEmails";
 import { generateJWT } from "../Utils/jwt";
-import { User } from "../Models/User";
+import { User, UserRole } from "../Models/User";
 import { Customer } from "../Models/Customer";
-import { UserRole } from "../Models/User";
+import { AuthToken } from "../Models/AuthToken";
+import { UserStats } from "../Models/UserStats";
+import { v4 as uuidv4 } from "uuid";
 
 // === === === Helpers === === ===
 const includeBasics = [
@@ -25,68 +27,81 @@ export const createAccount = async (req: Request, res: Response) => {
       fullName: string;
       email: string;
       password: string;
-      phone: string;
-      role: UserRole;
+      phone?: string;
+      role?: UserRole;
     };
 
-    if (!fullName?.trim() || !email?.trim() || !password?.trim()) {
-      return res
-        .status(400)
-        .json({ error: "fullName, email y password son requeridos." });
-    }
-
     const normEmail = email.trim().toLowerCase();
+
+    // Verificar si el email ya existe
     const exists = await User.findOne({ where: { email: normEmail } });
     if (exists) {
       return res.status(409).json({ error: "El email ya está registrado" });
     }
 
-    const password_hash = await hashPassword(password);
+    const passwordHash = await hashPassword(password);
     const token = generateToken();
 
+    // Crear el usuario con el nuevo modelo
     const newUser = await User.create({
       fullName: fullName.trim(),
       email: normEmail,
-      password_hash,
-      token,
-      phone,
-      role,
+      passwordHash,
+      phone: phone || null,
+      role: role || "customer", // default customer
+      status: "active",
+      emailVerified: false,
+      phoneVerified: false,
+      preferences: {},
     });
 
+    // Crear AuthToken para verificación de email
+    await AuthToken.create({
+      userId: newUser.id,
+      token,
+      type: "email_verification",
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
+    });
+
+    // Inicializar UserStats para todos los usuarios
+    await UserStats.create({
+      userId: newUser.id,
+      totalGamesPlayed: 0,
+      totalHoursPlayed: 0,
+      currentMonthGames: 0,
+      totalSpent: 0,
+      streakDays: 0,
+      achievements: [],
+      preferencesData: null,
+    });
+
+    // Enviar email de verificación en producción
     if (process.env.NODE_ENV === "production") {
       await sendConfirmationEmail({
         name: newUser.fullName,
         email: newUser.email,
         token,
       });
-
+    } else {
+      // En desarrollo, guardar el token para testing
       (globalThis as any).royalPadelConfirmationToken = token;
     }
 
-    // Si el usuario tiene el rol de "customer" crearemos su perfil de cliente
+    // Si el usuario tiene el rol de "customer" crearemos su perfil de cliente (legacy)
     if (newUser.role === "customer") {
-      const customer = await Customer.create({
+      await Customer.create({
         userId: newUser.id,
-        notes: "", // notas vacías por defecto
+        notes: "",
       });
-
-      const withInclude = await User.findByPk(newUser.id, {
-        include: includeBasics,
-      });
-
-      res.status(200).json({
-        message:
-          "Clente creado con éxito, verifica tu email para confirmar tu cuenta",
-        withInclude,
-      });
-      return;
     }
 
     return res.status(201).json({
       message:
-        "Usuario creado correctamente, revisa tu correo para confirmar tu cuenta.",
+        "Usuario creado correctamente. Revisa tu correo para confirmar tu cuenta.",
+      userId: newUser.id,
     });
   } catch (error: any) {
+    console.error("Error creating account:", error);
     return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
@@ -144,16 +159,32 @@ export const changeEmail = async (req: Request, res: Response) => {
       return;
     }
 
-    user.email = req.body.email;
-    user.isActive = false;
-    user.token = generateToken();
-    await user.save();
+    const token = generateToken();
+
+    // Actualizar email y marcar como no verificado
+    await User.update(
+      {
+        email: req.body.email,
+        emailVerified: false,
+      },
+      {
+        where: { id: user.id },
+      }
+    );
+
+    // Crear nuevo AuthToken
+    await AuthToken.create({
+      userId: user.id,
+      token,
+      type: "email_verification",
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
+    });
 
     if (process.env.NODE_ENV === "production") {
       await sendConfirmationEmail({
         name: user.fullName,
-        email: user.email,
-        token: user.token,
+        email: req.body.email,
+        token,
       });
     }
 
@@ -161,28 +192,50 @@ export const changeEmail = async (req: Request, res: Response) => {
       message:
         "Email actualizado, es necesario que confirmes la cuenta desde tu bandeja de entrada para iniciar sesión de nuevo",
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
 
 export const confirmAccount = async (req: Request, res: Response) => {
   try {
     const { token } = req.body as { token: string };
-    const user = await User.findOne({ where: { token } });
 
-    if (!user) {
-      return res.status(401).json({ error: "El token es incorrecto" });
+    // Buscar AuthToken válido
+    const authToken = await AuthToken.findOne({
+      where: {
+        token,
+        type: "email_verification",
+        usedAt: null,
+        expiresAt: { [require("sequelize").Op.gt]: new Date() },
+      },
+      include: [{ model: User, as: "user" }],
+    });
+
+    if (!authToken || !authToken.user) {
+      return res.status(401).json({ error: "Token inválido o expirado" });
     }
 
-    user.isActive = true;
-    user.token = null; // borrar token por seguridad
-    await user.save();
+    // Marcar email como verificado
+    await User.update(
+      {
+        emailVerified: true,
+        status: "active",
+      },
+      { where: { id: authToken.userId } }
+    );
+
+    // Marcar token como usado
+    await AuthToken.update(
+      { usedAt: new Date() },
+      { where: { id: authToken.id } }
+    );
 
     return res.status(200).json({
-      message: "Código confirmado con éxito, ya puedes continuar 👌🏻",
+      message: "Email confirmado con éxito, ya puedes iniciar sesión 👌🏻",
     });
   } catch (error: any) {
+    console.error("Error confirming account:", error);
     return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
@@ -193,7 +246,16 @@ export const login = async (req: Request, res: Response) => {
     const normEmail = email?.trim().toLowerCase();
 
     const user = normEmail
-      ? await User.findOne({ where: { email: normEmail } })
+      ? await User.findOne({
+          where: { email: normEmail },
+          include: [
+            {
+              model: UserStats,
+              as: "stats",
+              required: false,
+            },
+          ],
+        })
       : null;
 
     if (!user) {
@@ -202,27 +264,50 @@ export const login = async (req: Request, res: Response) => {
       });
     }
 
-    if (!user.isActive) {
+    // Verificar estado del usuario
+    if (user.status !== "active") {
       return res.status(403).json({
-        error: "Necesitas confirmar tu cuenta para poder iniciar sesión",
+        error:
+          "Tu cuenta está suspendida o inactiva. Contacta al administrador.",
       });
     }
 
-    const isValidPassword = await comparePassword(password, user.password_hash);
+    // Verificar si el email está confirmado
+    if (!user.emailVerified) {
+      return res.status(403).json({
+        error: "Necesitas confirmar tu email para poder iniciar sesión",
+      });
+    }
+
+    const isValidPassword = await comparePassword(password, user.passwordHash);
     if (!isValidPassword) {
       return res.status(401).json({ error: "La contraseña es incorrecta ❌" });
     }
 
     const jwtToken = generateJWT(user.id);
 
-    if (process.env.NODE_ENV === "production") {
+    // Respuesta con información básica del usuario
+    const userResponse = {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      emailVerified: user.emailVerified,
+      phoneVerified: user.phoneVerified,
+      stats: user.stats || null,
+    };
+
+    if (process.env.NODE_ENV !== "production") {
       (globalThis as any).royalPadelJWT = jwtToken;
     }
 
-    return res
-      .status(200)
-      .json({ message: "Has iniciado sesión correctamente ✌🏻", jwtToken });
+    return res.status(200).json({
+      message: "Has iniciado sesión correctamente ✌🏻",
+      token: jwtToken,
+      user: userResponse,
+    });
   } catch (error: any) {
+    console.error("Error during login:", error);
     return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
@@ -242,21 +327,32 @@ export const forgotPassword = async (req: Request, res: Response) => {
       });
     }
 
-    user.token = generateToken();
-    await user.save();
+    const token = generateToken();
+
+    // Crear AuthToken para reset de contraseña
+    await AuthToken.create({
+      userId: user.id,
+      token,
+      type: "password_reset",
+      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
+    });
 
     if (process.env.NODE_ENV === "production") {
       await sendPassworsResetToken({
         name: user.fullName,
         email: user.email,
-        token: user.token!,
+        token,
       });
+    } else {
+      // En desarrollo, guardar el token para testing
+      (globalThis as any).royalPadelPasswordResetToken = token;
     }
 
     return res
       .status(200)
       .json({ message: "Revisa tu email para restablecer la contraseña" });
   } catch (error: any) {
+    console.error("Error in forgot password:", error);
     return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
@@ -264,10 +360,18 @@ export const forgotPassword = async (req: Request, res: Response) => {
 export const validateToken = async (req: Request, res: Response) => {
   try {
     const { token } = req.body as { token: string };
-    const tokenExist = await User.findOne({ where: { token } });
 
-    if (!tokenExist) {
-      return res.status(403).json({ error: "Token incorrecto, verifícalo" });
+    const authToken = await AuthToken.findOne({
+      where: {
+        token,
+        type: "password_reset",
+        usedAt: null,
+        expiresAt: { [require("sequelize").Op.gt]: new Date() },
+      },
+    });
+
+    if (!authToken) {
+      return res.status(403).json({ error: "Token incorrecto o expirado" });
     }
 
     return res.status(200).json({
@@ -283,19 +387,37 @@ export const resetPasswordWithToken = async (req: Request, res: Response) => {
     const { token } = req.params as { token: string };
     const { password } = req.body as { password: string };
 
-    const user = await User.findOne({ where: { token } });
-    if (!user) {
-      return res.status(404).json({ error: "Token inválido, verifícalo" });
+    const authToken = await AuthToken.findOne({
+      where: {
+        token,
+        type: "password_reset",
+        usedAt: null,
+        expiresAt: { [require("sequelize").Op.gt]: new Date() },
+      },
+      include: [{ model: User, as: "user" }],
+    });
+
+    if (!authToken || !authToken.user) {
+      return res.status(404).json({ error: "Token inválido o expirado" });
     }
 
-    user.password_hash = await hashPassword(password);
-    user.token = null;
-    await user.save();
+    // Actualizar contraseña
+    await User.update(
+      { passwordHash: await hashPassword(password) },
+      { where: { id: authToken.userId } }
+    );
+
+    // Marcar token como usado
+    await AuthToken.update(
+      { usedAt: new Date() },
+      { where: { id: authToken.id } }
+    );
 
     return res
       .status(200)
       .json({ message: "Has restablecido tu contraseña exitosamente ✅" });
   } catch (error: any) {
+    console.error("Error resetting password:", error);
     return res.status(500).json({ error: error.message ?? "Error interno" });
   }
 };
@@ -316,15 +438,17 @@ export const updateCurrentPassword = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
-    const ok = await comparePassword(currentPassword, user.password_hash);
+    const ok = await comparePassword(currentPassword, user.passwordHash);
     if (!ok) {
       return res
         .status(401)
         .json({ error: "La contraseña actual es incorrecta" });
     }
 
-    user.password_hash = await hashPassword(newPassword);
-    await user.save();
+    await User.update(
+      { passwordHash: await hashPassword(newPassword) },
+      { where: { id: user.id } }
+    );
 
     return res.status(200).json({ message: "Contraseña actualizada" });
   } catch (error: any) {
@@ -346,7 +470,7 @@ export const checkPassword = async (req: Request, res: Response) => {
 
     const isPasswordCorrect = await comparePassword(
       password,
-      user.password_hash
+      user.passwordHash
     );
     if (!isPasswordCorrect) {
       return res.status(401).json({ error: "La contraseña es incorrecta 😞" });

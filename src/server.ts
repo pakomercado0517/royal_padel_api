@@ -28,9 +28,9 @@ server.use(
 // Routes middleware
 server.use("/user", authRouter);
 server.use("/court", courtRouter);
+server.use("/reservation", reservationRouter);
 server.use("/customer", customerRouter);
 server.use("/payment", paymentRouter);
-server.use("/reservation", reservationRouter);
 
 //Error catching endware
 server.use((err: any, req: Request, res: Response, next: NextFunction) => {

@@ -13,7 +13,7 @@ import { Reservation } from "./Reservation";
 
 export interface CustomerAttributes {
   id: number;
-  userId?: number | null;
+  userId?: string | null; // UUID
   // fullName: string;
   // email?: string | null;
   // phone?: string | null;
@@ -29,8 +29,8 @@ export class Customer extends Model<
   CustomerCreationAttributes
 > {
   @ForeignKey(() => User)
-  @Column(DataType.BIGINT)
-  declare userId: number | null;
+  @Column(DataType.UUID)
+  declare userId: string | null;
 
   // @AllowNull(false)
   // @Column(DataType.STRING)

@@ -156,6 +156,11 @@ router.put(
     .optional()
     .isMobilePhone("es-MX")
     .withMessage("Teléfono debe ser válido"),
+  body("avatarUrl")
+    .optional({ values: "falsy" })
+    .trim()
+    .isURL()
+    .withMessage("La URL de la imagen es requerida"),
   handleInputErrors,
   authControllers.updateUserData
 );

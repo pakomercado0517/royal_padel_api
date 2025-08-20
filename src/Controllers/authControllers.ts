@@ -148,6 +148,7 @@ export const getUserData = async (req: Request, res: Response) => {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
+      phone: user.phone,
       status: user.status,
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
@@ -523,9 +524,11 @@ export const updateUserData = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "No autenticado" });
     }
 
-    const { fullName, email } = req.body as {
+    const { fullName, email, phone, avatarUrl } = req.body as {
       fullName?: string;
       email?: string;
+      phone: string;
+      avatarUrl: string;
     };
     const normEmail = email?.trim().toLowerCase();
 
@@ -544,6 +547,8 @@ export const updateUserData = async (req: Request, res: Response) => {
       {
         ...(fullName ? { fullName: fullName.trim() } : {}),
         ...(normEmail ? { email: normEmail } : {}),
+        phone,
+        avatarUrl,
       },
       { where: { id: req.user.id } }
     );

@@ -7,6 +7,13 @@ import { Customer } from "../Models/Customer";
 import { Court } from "../Models/Court";
 import { Reservation } from "../Models/Reservation";
 import { Payment } from "../Models/Payment";
+import { AuthToken } from "../Models/AuthToken";
+import { CourtPricing } from "../Models/CourtPricing";
+import { ReservationPlayer } from "../Models/ReservationPlayer";
+import { UserStats } from "../Models/UserStats";
+import { CourtAvailability } from "../Models/CourtAvailability";
+import { UserAchievement } from "../Models/UserAchievement";
+import { Notification } from "../Models/Notification";
 
 const { DATABASE_URL } = process.env;
 
@@ -22,7 +29,20 @@ export const conn = new Sequelize(`${DATABASE_URL}`, {
     },
   },
   // 👇 clave: registra aquí las clases de modelos
-  models: [User, Customer, Court, Reservation, Payment],
+  models: [
+    User, 
+    Customer, 
+    Court, 
+    Reservation, 
+    Payment, 
+    AuthToken, 
+    CourtPricing, 
+    ReservationPlayer, 
+    UserStats, 
+    CourtAvailability, 
+    UserAchievement, 
+    Notification
+  ],
 });
 
 // Las relaciones se declaran en los decoradores de cada modelo
@@ -35,5 +55,12 @@ export default {
   Court,
   Reservation,
   Payment,
+  AuthToken,
+  CourtPricing,
+  ReservationPlayer,
+  UserStats,
+  CourtAvailability,
+  UserAchievement,
+  Notification,
   conn,
 };

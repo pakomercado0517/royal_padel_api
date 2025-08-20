@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { verifyJWT } from "../Utils/jwt";
 import { User } from "../Models/User";
 import { param, validationResult } from "express-validator";
+import { UserStats } from "../Models/UserStats";
 
 declare global {
   namespace Express {
@@ -73,7 +74,17 @@ export const authenticate = async (
 
     if (typeof payload === "object" && payload.id) {
       const user = await User.findByPk(payload.id, {
-        attributes: ["id", "fullName", "email", "role", "status", "emailVerified"],
+        attributes: [
+          "id",
+          "fullName",
+          "email",
+          "role",
+          "status",
+          "emailVerified",
+          "phoneVerified",
+          "avatarUrl",
+        ],
+        include: [{ model: UserStats }],
       });
 
       if (!user) {
@@ -96,7 +107,7 @@ export const authenticate = async (
       return res.status(401).json({ error: "Token inválido" });
     }
   } catch (error) {
-    console.error('Authentication error:', error);
+    console.error("Authentication error:", error);
     return res.status(401).json({ error: "Token inválido o expirado" });
   }
 };
@@ -109,8 +120,8 @@ export const authorize = (...roles: string[]) => {
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        error: `Acceso denegado. Roles requeridos: ${roles.join(', ')}` 
+      return res.status(403).json({
+        error: `Acceso denegado. Roles requeridos: ${roles.join(", ")}`,
       });
     }
 

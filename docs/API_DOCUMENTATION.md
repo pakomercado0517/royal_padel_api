@@ -3,13 +3,17 @@
 ## 📋 Índice
 
 1. [Introducción](#introducción)
-2. [Autenticación y Autorización](#autenticación-y-autorización)
-3. [Disponibilidad de Canchas (CourtAvailability)](#disponibilidad-de-canchas-courtavailability)
-4. [Precios Dinámicos (CourtPricing)](#precios-dinámicos-courtpricing)
-5. [Notificaciones (Notifications)](#notificaciones-notifications)
-6. [Pagos (Payments)](#pagos-payments)
-7. [Códigos de Estado](#códigos-de-estado)
-8. [Ejemplos de Uso](#ejemplos-de-uso)
+2. [Autenticación (Auth)](#autenticación-auth)
+3. [Gestión de Usuarios](#gestión-de-usuarios)
+4. [Gestión de Canchas (Courts)](#gestión-de-canchas-courts)
+5. [Disponibilidad de Canchas (CourtAvailability)](#disponibilidad-de-canchas-courtavailability)
+6. [Precios Dinámicos (CourtPricing)](#precios-dinámicos-courtpricing)
+7. [Reservas (Reservations)](#reservas-reservations)
+8. [Clientes (Customers)](#clientes-customers)
+9. [Notificaciones (Notifications)](#notificaciones-notifications)
+10. [Pagos (Payments)](#pagos-payments)
+11. [Códigos de Estado](#códigos-de-estado)
+12. [Ejemplos de Uso](#ejemplos-de-uso)
 
 ---
 
@@ -31,15 +35,774 @@ Authorization: Bearer <token>
 
 ---
 
-## 🔐 Autenticación y Autorización
+---
+
+## 🔐 Autenticación (Auth)
+
+Base URL: `/api/user`
 
 ### Roles de Usuario
 - **customer**: Usuario cliente (puede ver disponibilidad, calcular precios)
 - **staff**: Personal del club (puede gestionar disponibilidad y ver reportes)
 - **admin**: Administrador (acceso completo al sistema)
 
-### Token JWT
-Incluir en el header: `Authorization: Bearer <your-jwt-token>`
+### 📝 Crear Cuenta
+
+**POST** `/create_account`
+**Permisos:** público
+
+```json
+{
+  "fullName": "Juan Pérez",
+  "email": "juan@example.com",
+  "password": "MiPassword123",
+  "phone": "5551234567",
+  "role": "customer"
+}
+```
+
+**Validaciones:**
+- `fullName`: 2-100 caracteres
+- `email`: formato de email válido
+- `password`: mínimo 8 caracteres, debe contener mayúscula, minúscula y número
+- `phone`: número móvil válido (México)
+- `role`: customer, staff o admin (opcional, default: customer)
+
+**Respuesta:**
+```json
+{
+  "message": "Usuario creado correctamente. Revisa tu correo para confirmar tu cuenta.",
+  "userId": "uuid-usuario"
+}
+```
+
+### ✅ Confirmar Cuenta
+
+**POST** `/confirm_account`
+**Permisos:** público
+
+```json
+{
+  "token": "123456"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Email confirmado con éxito, ya puedes iniciar sesión 👌🏻"
+}
+```
+
+### 🔑 Iniciar Sesión
+
+**POST** `/login`
+**Permisos:** público
+
+```json
+{
+  "email": "juan@example.com",
+  "password": "MiPassword123"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Has iniciado sesión correctamente ✌🏻",
+  "token": "jwt-token-aqui",
+  "user": {
+    "id": "uuid-usuario",
+    "fullName": "Juan Pérez",
+    "email": "juan@example.com",
+    "role": "customer",
+    "emailVerified": true,
+    "phoneVerified": false,
+    "stats": {
+      "totalGamesPlayed": 0,
+      "totalHoursPlayed": 0,
+      "currentMonthGames": 0
+    }
+  }
+}
+```
+
+### 🔄 Olvidé mi Contraseña
+
+**POST** `/forgot_password`
+**Permisos:** público
+
+```json
+{
+  "email": "juan@example.com"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Revisa tu email para restablecer la contraseña"
+}
+```
+
+### 🔓 Validar Token de Recuperación
+
+**POST** `/validate_token`
+**Permisos:** público
+
+```json
+{
+  "token": "123456"
+}
+```
+
+### 🔄 Restablecer Contraseña
+
+**POST** `/reset_password/:token`
+**Permisos:** público
+
+```json
+{
+  "password": "NuevaPassword123"
+}
+```
+
+---
+
+## 👤 Gestión de Usuarios
+
+Base URL: `/api/user`
+
+### 👤 Obtener Perfil
+
+**GET** `/profile`
+**Permisos:** customer, staff, admin (usuario autenticado)
+
+**Respuesta:**
+```json
+{
+  "message": "Perfil obtenido exitosamente",
+  "user": {
+    "id": "uuid-usuario",
+    "fullName": "Juan Pérez",
+    "email": "juan@example.com",
+    "role": "customer",
+    "status": "active",
+    "emailVerified": true,
+    "phoneVerified": false
+  }
+}
+```
+
+### ✏️ Actualizar Datos de Usuario
+
+**PUT** `/`
+**Permisos:** customer, staff, admin (usuario autenticado)
+
+```json
+{
+  "fullName": "Juan Carlos Pérez",
+  "email": "juancarlos@example.com",
+  "phone": "5551234568"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Información actualizada 👍🏻"
+}
+```
+
+### 🔑 Cambiar Contraseña
+
+**POST** `/update_password`
+**Permisos:** customer, staff, admin (usuario autenticado)
+
+```json
+{
+  "currentPassword": "PasswordActual123",
+  "newPassword": "PasswordNueva456"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Contraseña actualizada"
+}
+```
+
+### ✅ Verificar Contraseña
+
+**POST** `/check_password`
+**Permisos:** customer, staff, admin (usuario autenticado)
+
+```json
+{
+  "password": "MiPasswordActual123"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Contraseña correcta"
+}
+```
+
+### 📧 Cambiar Email
+
+**PUT** `/:id/change_email`
+**Permisos:** admin (o el mismo usuario)
+
+```json
+{
+  "email": "nuevoemail@example.com"
+}
+```
+
+### 📤 Reenviar Verificación
+
+**POST** `/resend_verification`
+**Permisos:** público
+
+```json
+{
+  "email": "juan@example.com"
+}
+```
+
+---
+
+## 🏟️ Gestión de Canchas (Courts)
+
+Base URL: `/api/court`
+
+### 🏟️ Crear Cancha
+
+**POST** `/`
+**Permisos:** admin
+
+```json
+{
+  "name": "Cancha Central",
+  "description": "Cancha principal con iluminación LED",
+  "capacity": 4,
+  "features": ["iluminación LED", "aire acondicionado", "vestuarios"],
+  "basePricePerHour": 50.00,
+  "status": "active",
+  "locationDetails": "Planta baja, lado oeste",
+  "images": ["image1.jpg", "image2.jpg"]
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Cancha creada exitosamente",
+  "court": {
+    "id": "uuid-cancha",
+    "name": "Cancha Central",
+    "description": "Cancha principal con iluminación LED",
+    "capacity": 4,
+    "features": ["iluminación LED", "aire acondicionado", "vestuarios"],
+    "basePricePerHour": 50.00,
+    "status": "active",
+    "locationDetails": "Planta baja, lado oeste",
+    "images": ["image1.jpg", "image2.jpg"],
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### 📋 Listar Canchas
+
+**GET** `/`
+**Permisos:** customer, staff, admin
+
+**Query Parameters:**
+- `q` (opcional): Búsqueda por nombre o descripción
+- `status` (opcional): active/maintenance/inactive
+- `minPrice` (opcional): Precio mínimo por hora
+- `maxPrice` (opcional): Precio máximo por hora
+- `features` (opcional): Características separadas por comas
+- `page` (opcional): Número de página
+- `pageSize` (opcional): Elementos por página
+
+**Ejemplo:** `/api/court?status=active&minPrice=40&features=aire acondicionado`
+
+**Respuesta:**
+```json
+{
+  "courts": [
+    {
+      "id": "uuid-cancha",
+      "name": "Cancha Central",
+      "description": "Cancha principal con iluminación LED",
+      "capacity": 4,
+      "features": ["iluminación LED", "aire acondicionado"],
+      "basePricePerHour": 50.00,
+      "status": "active",
+      "pricing": [
+        {
+          "id": "pricing-uuid",
+          "dayOfWeek": 1,
+          "startTime": "18:00",
+          "endTime": "22:00",
+          "pricePerHour": 75.00
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "pageSize": 20,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  }
+}
+```
+
+### 🔍 Obtener Cancha por ID
+
+**GET** `/:id`
+**Permisos:** customer, staff, admin
+
+**Respuesta:**
+```json
+{
+  "id": "uuid-cancha",
+  "name": "Cancha Central",
+  "description": "Cancha principal con iluminación LED",
+  "capacity": 4,
+  "features": ["iluminación LED", "aire acondicionado"],
+  "basePricePerHour": 50.00,
+  "status": "active",
+  "locationDetails": "Planta baja, lado oeste",
+  "images": ["image1.jpg", "image2.jpg"],
+  "reservations": [
+    {
+      "id": "reservation-uuid",
+      "reservationDate": "2024-01-16",
+      "startTime": "18:00",
+      "endTime": "20:00",
+      "status": "confirmed"
+    }
+  ],
+  "pricing": [
+    {
+      "id": "pricing-uuid",
+      "dayOfWeek": 1,
+      "startTime": "18:00",
+      "endTime": "22:00",
+      "pricePerHour": 75.00,
+      "isActive": true
+    }
+  ],
+  "statistics": {
+    "upcomingReservations": 3,
+    "favoriteUsers": 12
+  }
+}
+```
+
+### ✏️ Actualizar Cancha
+
+**PUT** `/:id`
+**Permisos:** admin
+
+```json
+{
+  "name": "Cancha Central Premium",
+  "description": "Cancha renovada con nuevas comodidades",
+  "basePricePerHour": 60.00,
+  "features": ["iluminación LED", "aire acondicionado", "vestuarios", "wifi"]
+}
+```
+
+### 🔄 Cambiar Estado de Cancha
+
+**PATCH** `/:id/status`
+**Permisos:** admin
+
+```json
+{
+  "status": "maintenance",
+  "reason": "Renovación del piso"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Status de cancha cambiado de active a maintenance",
+  "court": {
+    "id": "uuid-cancha",
+    "status": "maintenance"
+  }
+}
+```
+
+### 🗑️ Eliminar Cancha
+
+**DELETE** `/:id`
+**Permisos:** admin
+
+**Respuesta:**
+```json
+{
+  "message": "Cancha eliminada exitosamente",
+  "courtId": "uuid-cancha"
+}
+```
+
+---
+
+## 📅 Reservas (Reservations)
+
+Base URL: `/api/reservation`
+
+### 📅 Crear Reserva
+
+**POST** `/`
+**Permisos:** customer, staff, admin
+
+```json
+{
+  "courtId": "uuid-cancha",
+  "reservationDate": "2024-01-20",
+  "startTime": "18:00",
+  "endTime": "20:00",
+  "totalPrice": 150.00,
+  "bookingType": "individual",
+  "specialRequests": "Solicito pelotas nuevas"
+}
+```
+
+**Valores válidos:**
+- `bookingType`: individual, group, tournament
+- `startTime`/`endTime`: formato HH:MM (24 horas)
+- `reservationDate`: formato YYYY-MM-DD
+
+**Respuesta:**
+```json
+{
+  "message": "Reservación creada exitosamente",
+  "reservation": {
+    "id": "uuid-reserva",
+    "userId": "uuid-usuario",
+    "courtId": "uuid-cancha",
+    "reservationDate": "2024-01-20",
+    "startTime": "18:00",
+    "endTime": "20:00",
+    "durationMinutes": 120,
+    "totalPrice": 150.00,
+    "bookingType": "individual",
+    "status": "confirmed",
+    "specialRequests": "Solicito pelotas nuevas",
+    "court": {
+      "id": "uuid-cancha",
+      "name": "Cancha Central",
+      "basePricePerHour": 50.00
+    },
+    "user": {
+      "id": "uuid-usuario",
+      "fullName": "Juan Pérez",
+      "email": "juan@example.com"
+    }
+  }
+}
+```
+
+### 📋 Listar Reservas
+
+**GET** `/`
+**Permisos:** customer (sus propias), staff, admin
+
+**Query Parameters:**
+- `courtId` (opcional): UUID de la cancha
+- `userId` (opcional): UUID del usuario
+- `dateFrom` (opcional): Fecha desde (YYYY-MM-DD)
+- `dateTo` (opcional): Fecha hasta (YYYY-MM-DD)
+- `status` (opcional): pending/confirmed/completed/cancelled/no_show
+- `bookingType` (opcional): individual/group/tournament
+- `page` (opcional): Número de página
+- `pageSize` (opcional): Elementos por página
+
+**Respuesta:**
+```json
+{
+  "reservations": [
+    {
+      "id": "uuid-reserva",
+      "reservationDate": "2024-01-20",
+      "startTime": "18:00",
+      "endTime": "20:00",
+      "totalPrice": 150.00,
+      "status": "confirmed",
+      "court": {
+        "id": "uuid-cancha",
+        "name": "Cancha Central"
+      },
+      "user": {
+        "id": "uuid-usuario",
+        "fullName": "Juan Pérez"
+      },
+      "payment": {
+        "id": "uuid-pago",
+        "amount": 150.00,
+        "status": "completed"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "pageSize": 20,
+    "totalPages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  }
+}
+```
+
+### 🔍 Obtener Reserva por ID
+
+**GET** `/:id`
+**Permisos:** customer (propietario), staff, admin
+
+### ✏️ Actualizar Reserva
+
+**PUT** `/:id`
+**Permisos:** customer (propietario), staff, admin
+
+```json
+{
+  "reservationDate": "2024-01-21",
+  "startTime": "19:00",
+  "endTime": "21:00",
+  "specialRequests": "Cambio de horario por lluvia"
+}
+```
+
+### ❌ Cancelar Reserva
+
+**POST** `/:id/cancel`
+**Permisos:** customer (propietario), staff, admin
+
+```json
+{
+  "cancellationReason": "Enfermedad"
+}
+```
+
+### ✅ Completar Reserva
+
+**POST** `/:id/complete`
+**Permisos:** staff, admin
+
+### ⚠️ Marcar No-Show
+
+**POST** `/:id/no-show`
+**Permisos:** staff, admin
+
+### 🗑️ Eliminar Reserva
+
+**DELETE** `/:id`
+**Permisos:** customer (propietario), staff, admin
+
+### 🔍 Verificar Disponibilidad
+
+**GET** `/availability/:courtId`
+**Permisos:** público
+
+**Query Parameters:**
+- `date` (requerido): Fecha (YYYY-MM-DD)
+- `startTime` (opcional): Hora inicio (HH:MM)
+- `endTime` (opcional): Hora fin (HH:MM)
+
+**Respuesta:**
+```json
+{
+  "available": true,
+  "courtId": "uuid-cancha",
+  "date": "2024-01-20",
+  "startTime": "18:00",
+  "endTime": "20:00",
+  "duration": 120
+}
+```
+
+### 👤 Obtener Reservas de Usuario
+
+**GET** `/user/:userId`
+**Permisos:** customer (sus propias), staff, admin
+
+### 📊 Estadísticas de Reservas
+
+**GET** `/stats`
+**Permisos:** staff, admin
+
+**Query Parameters:**
+- `dateFrom` (opcional): Fecha desde
+- `dateTo` (opcional): Fecha hasta
+- `courtId` (opcional): UUID de cancha específica
+- `userId` (opcional): UUID de usuario específico
+
+**Respuesta:**
+```json
+{
+  "totalReservations": 150,
+  "totalRevenue": 7500.00,
+  "cancellationRate": 8.5,
+  "statusBreakdown": [
+    { "status": "confirmed", "count": 100 },
+    { "status": "completed", "count": 35 },
+    { "status": "cancelled", "count": 10 },
+    { "status": "no_show", "count": 5 }
+  ],
+  "bookingTypeBreakdown": [
+    { "bookingType": "individual", "count": 120 },
+    { "bookingType": "group", "count": 25 },
+    { "bookingType": "tournament", "count": 5 }
+  ],
+  "period": {
+    "from": "2024-01-01",
+    "to": "2024-01-31"
+  }
+}
+```
+
+---
+
+## 👥 Clientes (Customers)
+
+Base URL: `/api/customer`
+
+### 👤 Crear Cliente
+
+**POST** `/`
+**Permisos:** staff, admin
+
+```json
+{
+  "notes": "Cliente VIP, prefiere canchas techadas"
+}
+```
+
+**Respuesta:**
+```json
+{
+  "message": "Datos de cliente creados con éxito"
+}
+```
+
+### 📋 Listar Clientes
+
+**GET** `/`
+**Permisos:** staff, admin
+
+**Query Parameters:**
+- `q` (opcional): Búsqueda por nombre, email o teléfono
+- `page` (opcional): Número de página
+- `pageSize` (opcional): Elementos por página
+
+**Respuesta:**
+```json
+{
+  "items": [
+    {
+      "id": "uuid-cliente",
+      "userId": "uuid-usuario",
+      "notes": "Cliente VIP",
+      "user": {
+        "id": "uuid-usuario",
+        "fullName": "Juan Pérez",
+        "email": "juan@example.com",
+        "phone": "5551234567",
+        "role": "customer",
+        "isActive": true
+      }
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "pageSize": 20,
+  "totalPages": 1
+}
+```
+
+### 🔍 Obtener Cliente por ID
+
+**GET** `/:id`
+**Permisos:** staff, admin
+
+**Respuesta:**
+```json
+{
+  "id": "uuid-cliente",
+  "userId": "uuid-usuario",
+  "notes": "Cliente VIP",
+  "user": {
+    "id": "uuid-usuario",
+    "fullName": "Juan Pérez",
+    "email": "juan@example.com",
+    "phone": "5551234567"
+  },
+  "reservations": [
+    {
+      "id": "uuid-reserva",
+      "reservationDate": "2024-01-20",
+      "startTime": "18:00",
+      "status": "confirmed"
+    }
+  ]
+}
+```
+
+### ✏️ Actualizar Cliente
+
+**PUT** `/:id`
+**Permisos:** staff, admin
+
+```json
+{
+  "notes": "Cliente VIP, actualizado con descuento especial",
+  "userId": "uuid-nuevo-usuario"
+}
+```
+
+### 🗑️ Eliminar Cliente
+
+**DELETE** `/:id`
+**Permisos:** admin
+
+### 📅 Reservas del Cliente
+
+**GET** `/:id/reservations`
+**Permisos:** staff, admin
+
+### 🔗 Vincular Usuario
+
+**POST** `/:id/link-user`
+**Permisos:** admin
+
+```json
+{
+  "userId": "uuid-usuario-nuevo"
+}
+```
+
+### 🔗 Desvincular Usuario
+
+**POST** `/:id/unlink-user`
+**Permisos:** admin
+
+**Nota:** No permitido - cada cliente debe tener un usuario asociado.
 
 ---
 

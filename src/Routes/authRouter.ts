@@ -13,15 +13,14 @@ router.post(
     .trim()
     .isLength({ min: 2, max: 100 })
     .withMessage("Nombre Completo debe tener entre 2 y 100 caracteres"),
-  body("email")
-    .isEmail()
-    .normalizeEmail()
-    .withMessage("Email debe ser válido"),
+  body("email").isEmail().normalizeEmail().withMessage("Email debe ser válido"),
   body("password")
     .isLength({ min: 8 })
     .withMessage("La contraseña debe tener al menos 8 caracteres")
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage("La contraseña debe contener al menos una minúscula, una mayúscula y un número"),
+    .withMessage(
+      "La contraseña debe contener al menos una minúscula, una mayúscula y un número"
+    ),
   body("phone")
     .optional()
     .isMobilePhone("es-MX")
@@ -162,31 +161,7 @@ router.put(
 );
 
 // GET /profile (obtener perfil del usuario autenticado)
-router.get(
-  "/profile",
-  authenticate,
-  async (req, res) => {
-    try {
-      const user = req.user;
-      const userProfile = {
-        id: user.id,
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified
-      };
-      
-      res.json({
-        message: "Perfil obtenido exitosamente",
-        user: userProfile
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message ?? "Error interno" });
-    }
-  }
-);
+router.get("/profile", authenticate, authControllers.getUserData);
 
 // POST /resend_verification (reenviar email de verificación)
 router.post(

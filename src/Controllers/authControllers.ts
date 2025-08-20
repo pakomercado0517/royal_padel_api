@@ -140,6 +140,41 @@ export const updateUser = async (req: Request, res: Response) => {
   }
 };
 
+export const getUserData = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    const userProfile = {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      emailVerified: user.emailVerified,
+      phoneVerified: user.phoneVerified,
+      avatarUrl: !user.avatarUrl ? "" : user.avatarUrl,
+      stats: {
+        id: user.stats.id,
+        userId: user.stats.userId,
+        totalGamesPlayed: user.stats.totalGamesPlayed,
+        totalHoursPlayed: user.stats.totalHoursPlayed,
+        currentMonthGames: user.stats.currentMonthGames,
+        favoriteCourtId: user.stats.favoriteCourtId ?? "",
+        totalSpent: user.stats.totalSpent,
+        averageRating: user.stats.averageRating ?? 0,
+        lastGameDate: user.stats.lastGameDate ?? "",
+        streakDays: user.stats.streakDays,
+        achievements: user.stats.achievements,
+        preferencesData: user.stats.preferencesData ?? [],
+      },
+    };
+    res
+      .status(200)
+      .json({ message: "Perfil encontrado exitosamente", userProfile });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 export const changeEmail = async (req: Request, res: Response) => {
   const { id } = req.params;
   try {

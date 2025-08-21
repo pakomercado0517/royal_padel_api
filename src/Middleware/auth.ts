@@ -79,6 +79,7 @@ export const authenticate = async (
           "fullName",
           "email",
           "role",
+          "phone",
           "status",
           "emailVerified",
           "phoneVerified",

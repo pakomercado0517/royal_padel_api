@@ -106,40 +106,6 @@ export const createAccount = async (req: Request, res: Response) => {
   }
 };
 
-//* Importante, no cambiar el email aquí, para eso se hizo otra ruta donde se manda a confirmar el nuevo email
-export const updateUser = async (req: Request, res: Response) => {
-  const { id } = req.params;
-
-  try {
-    const user = await User.findByPk(id);
-
-    if (!user) {
-      const error = new Error("Usuario no encontrado");
-      res.status(404).json({ error: error.message });
-      return;
-    }
-
-    user.fullName = req.body;
-    user.phone = req.body;
-
-    if (req.body.role && req.body.role === "customer") {
-      user.role = req.body;
-    }
-
-    if (user.role === "customer") {
-      const customer = await Customer.findOne({ where: { userId: user.id } });
-      customer.notes = req.body;
-
-      res.status(201).json({ message: "Cliente actualizado con éxito" });
-      return;
-    }
-
-    res.status(201).json({ message: "Usuario actualizado con éxito" });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
-
 export const getUserData = async (req: Request, res: Response) => {
   try {
     const user = req.user;
@@ -148,6 +114,7 @@ export const getUserData = async (req: Request, res: Response) => {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
+      phone: user.phone,
       status: user.status,
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
@@ -523,15 +490,19 @@ export const updateUserData = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "No autenticado" });
     }
 
-    const { fullName, email } = req.body as {
+    const { fullName, email, phone, avatarUrl } = req.body as {
       fullName?: string;
       email?: string;
+      phone: string;
+      avatarUrl: string;
     };
     const normEmail = email?.trim().toLowerCase();
 
-    if (normEmail) {
+    const newEmail = normEmail === req.user.email ? null : normEmail;
+
+    if (newEmail) {
       const verifyNewEmail = await User.findOne({
-        where: { email: normEmail },
+        where: { email: newEmail },
       });
       if (verifyNewEmail && verifyNewEmail.id !== req.user.id) {
         return res
@@ -539,17 +510,73 @@ export const updateUserData = async (req: Request, res: Response) => {
           .json({ error: "El email pertenece a otro usuario" });
       }
     }
-
     await User.update(
       {
         ...(fullName ? { fullName: fullName.trim() } : {}),
-        ...(normEmail ? { email: normEmail } : {}),
+        ...(newEmail ? { email: newEmail } : {}),
+        ...(phone ? { phone: phone.trim() } : {}),
+        ...(avatarUrl ? { avatarUrl: avatarUrl.trim() } : {}),
+        ...(newEmail ? { emailVerified: false } : {}),
       },
       { where: { id: req.user.id } }
     );
 
-    return res.status(200).json({ message: "Información actualizada 👍🏻" });
+    if (newEmail) {
+      const token = generateToken();
+      await AuthToken.update(
+        {
+          token,
+          type: "email_verification",
+          usedAt: null,
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
+        },
+        {
+          where: { userId: req.user.id },
+        }
+      );
+
+      if (process.env.NODE_ENV === "production") {
+        await sendConfirmationEmail({
+          name: req.user.fullName,
+          email: newEmail,
+          token,
+        });
+      }
+
+      return res.status(200).json({
+        message:
+          "Perfil actualizado con éxito, es necesario que confirmes el nuevo email desde tu bandeja de entrada 📥",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Información actualizada ✅",
+    });
   } catch (error: any) {
     return res.status(500).json({ error: error.message ?? "Error interno" });
+  }
+};
+
+export const updateAvatarUrl = async (req: Request, res: Response) => {
+  try {
+    const { avatarUrl } = req.body as {
+      avatarUrl: string;
+    };
+    if (!req.user.id) {
+      return res.status(403).json({ message: "Usuario no autenticado" });
+    }
+
+    await User.update(
+      {
+        ...(avatarUrl ? { avatarUrl: avatarUrl.trim() } : {}),
+      },
+      {
+        where: { id: req.user.id },
+      }
+    );
+
+    res.status(200).json({ message: "Imagen guardada con éxito" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };

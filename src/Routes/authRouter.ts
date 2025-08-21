@@ -33,21 +33,6 @@ router.post(
   authControllers.createAccount
 );
 
-//PUT /update_acount
-router.put(
-  "/:id/update_account",
-  body("fullName")
-    .trim()
-    .notEmpty()
-    .withMessage("Nombre completo es requerido"),
-  body("phone")
-    .optional()
-    .isMobilePhone("es-MX")
-    .withMessage("Teléfono debe ser un número válido"),
-  handleInputErrors,
-  authControllers.updateUser
-);
-
 //PUT /change_email
 router.put(
   "/:id/change_email",
@@ -109,8 +94,8 @@ router.post(
   authControllers.resetPasswordWithToken
 );
 
-// POST /update_password
-router.post(
+// PUT /update_password
+router.put(
   "/update_password",
   authenticate,
   body("currentPassword")
@@ -126,6 +111,7 @@ router.post(
       return true;
     }),
   handleInputErrors,
+  authenticate,
   authControllers.updateCurrentPassword
 );
 
@@ -163,6 +149,19 @@ router.put(
     .withMessage("La URL de la imagen es requerida"),
   handleInputErrors,
   authControllers.updateUserData
+);
+
+//PUT /update_avatarUrl
+router.put(
+  "/update_avatarURL",
+  body("avatarUrl")
+    .optional({ values: "falsy" })
+    .trim()
+    .isURL()
+    .withMessage("La URL de la imagen es requerida"),
+  handleInputErrors,
+  authenticate,
+  authControllers.updateAvatarUrl
 );
 
 // GET /profile (obtener perfil del usuario autenticado)

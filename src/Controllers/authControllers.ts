@@ -11,6 +11,8 @@ import { Customer } from "../Models/Customer";
 import { AuthToken } from "../Models/AuthToken";
 import { UserStats } from "../Models/UserStats";
 import { v4 as uuidv4 } from "uuid";
+import { OAuth2Client } from "google-auth-library";
+import axios from "axios";
 
 // === === === Helpers === === ===
 const includeBasics = [
@@ -114,8 +116,9 @@ export const getUserData = async (req: Request, res: Response) => {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
-      phone: user.phone,
+      phone: user.phone ?? "",
       status: user.status,
+      googleSub: user.googleSub ?? "",
       emailVerified: user.emailVerified,
       phoneVerified: user.phoneVerified,
       avatarUrl: !user.avatarUrl ? "" : user.avatarUrl,
@@ -578,5 +581,126 @@ export const updateAvatarUrl = async (req: Request, res: Response) => {
     res.status(200).json({ message: "Imagen guardada con éxito" });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+export const googleVerify = async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body as { code?: string };
+    if (!code) return res.status(400).json({ message: "Falta code" });
+
+    // 1) Intercambio code -> tokens
+    // Content-Type: x-www-form-urlencoded (recomendado por OAuth 2.0)
+    const params = new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET!, // asegúrate de tenerlo en .env
+      redirect_uri: "postmessage", // flujo JS popup
+      grant_type: "authorization_code",
+    });
+
+    const { data } = await axios.post(
+      "https://oauth2.googleapis.com/token",
+      params,
+      {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        timeout: 10000,
+      }
+    );
+
+    const id_token: string | undefined = data?.id_token;
+    if (!id_token || id_token.split(".").length !== 3) {
+      return res
+        .status(401)
+        .json({ message: "No se obtuvo un id_token válido de Google" });
+    }
+
+    // 2) Verificar id_token (JWT) y extraer datos
+    const ticket = await googleClient.verifyIdToken({
+      idToken: id_token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.sub)
+      return res.status(401).json({ message: "Token inválido" });
+    if (!payload.email || !payload.email_verified) {
+      return res
+        .status(403)
+        .json({ message: "El email de Google no está verificado" });
+    }
+
+    // 3) Mapear datos a tu modelo
+
+    const { sub, email, email_verified, name, picture } = payload;
+    if (!email || !email_verified) throw new Error("Email no verificado");
+
+    const normEmail = email.trim().toLowerCase();
+    console.log(`intentando ingresar el usuario ${payload.email}`);
+    console.log("sub", sub);
+    let user = await User.findOne({ where: { googleSub: sub } });
+    if (!user) {
+      user = await User.findOne({ where: { email: normEmail } });
+      if (user) {
+        if (user.googleSub && user.googleSub !== sub) {
+          // Conflicto: ya vinculado a otro Google
+          throw new Error("Cuenta ya vinculada a otro Google");
+        }
+        user.googleSub = sub;
+        user.emailVerified = true;
+        if (!user.avatarUrl && picture) user.avatarUrl = picture;
+        await user.save();
+      } else {
+        user = await User.create({
+          fullName: name || "Usuario Google",
+          email: normEmail,
+          phone: null,
+          avatarUrl: picture ?? "",
+          googleSub: sub,
+          emailVerified: true,
+        });
+        const token = generateToken();
+        // Crear AuthToken para verificación de email
+        await AuthToken.create({
+          userId: user.id,
+          token,
+          type: "email_verification",
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
+        });
+
+        // Inicializar UserStats para todos los usuarios
+        await UserStats.create({
+          userId: user.id,
+          totalGamesPlayed: 0,
+          totalHoursPlayed: 0,
+          currentMonthGames: 0,
+          totalSpent: 0,
+          streakDays: 0,
+          achievements: [],
+          preferencesData: null,
+        });
+      }
+    }
+    const jwtToken = await generateJWT(user.id);
+
+    if (process.env.NODE_ENV !== "production") {
+      (globalThis as any).royalPadelJWT = jwtToken;
+    }
+
+    return res.status(200).json({
+      message: "Has iniciado sesión correctamente ✌🏻",
+      token: jwtToken,
+    });
+  } catch (err: any) {
+    console.error(
+      "googleCodeController error:",
+      err?.response?.data || err?.message || err
+    );
+    // Errores comunes:
+    // - invalid_grant: code usado/expirado, o redirect_uri no coincide
+    // - redirect_uri mismatch: asegúrate de usar 'postmessage' si usas initCodeClient (popup)
+    // - client_secret/GOOGLE_CLIENT_ID incorrectos
+    return res.status(500).json({ message: "Error Google code flow" });
   }
 };

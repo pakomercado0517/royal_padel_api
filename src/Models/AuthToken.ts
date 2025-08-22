@@ -12,7 +12,10 @@ import {
 } from "sequelize-typescript";
 import { User } from "./User";
 
-export type TokenType = "email_verification" | "password_reset" | "phone_verification";
+export type TokenType =
+  | "email_verification"
+  | "password_reset"
+  | "phone_verification";
 
 export interface AuthTokenAttributes {
   id: string; // UUID
@@ -29,10 +32,10 @@ export interface AuthTokenAttributes {
 export interface AuthTokenCreationAttributes
   extends Omit<AuthTokenAttributes, "id" | "createdAt" | "updatedAt"> {}
 
-@Table({ 
-  tableName: "auth_tokens", 
+@Table({
+  tableName: "auth_tokens",
   timestamps: true,
-  underscored: true // snake_case en DB
+  underscored: true, // snake_case en DB
 })
 export class AuthToken extends Model<
   AuthTokenAttributes,
@@ -54,7 +57,9 @@ export class AuthToken extends Model<
   declare token: string;
 
   @AllowNull(false)
-  @Column(DataType.ENUM("email_verification", "password_reset", "phone_verification"))
+  @Column(
+    DataType.ENUM("email_verification", "password_reset", "phone_verification")
+  )
   declare type: TokenType;
 
   @AllowNull(false)

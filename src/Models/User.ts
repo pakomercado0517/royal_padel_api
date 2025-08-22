@@ -27,13 +27,14 @@ export type UserRole = "admin" | "staff" | "customer";
 export interface UserAttributes {
   id: string; // UUID
   email: string;
-  passwordHash: string;
+  passwordHash: string | null; // Permite null para usuarios creados vía Google
   fullName: string;
   phone?: string | null;
   avatarUrl?: string | null;
   dateOfBirth?: Date | null;
   status: UserStatus;
   role: UserRole;
+  googleSub: string | null;
   emailVerified: boolean;
   phoneVerified: boolean;
   preferences: object;
@@ -43,18 +44,30 @@ export interface UserAttributes {
 }
 
 export interface UserCreationAttributes
-  extends Omit<UserAttributes, "id" | "status" | "role" | "emailVerified" | "phoneVerified" | "createdAt" | "updatedAt"> {
+  extends Omit<
+    UserAttributes,
+    | "id"
+    | "status"
+    | "role"
+    | "emailVerified"
+    | "phoneVerified"
+    | "createdAt"
+    | "updatedAt"
+    | "passwordHash"
+  > {
   status?: UserStatus;
   role?: UserRole;
   emailVerified?: boolean;
   phoneVerified?: boolean;
+  // Hacer opcional para permitir alta sin contraseña (Google)
+  passwordHash?: string | null;
 }
 
-@Table({ 
-  tableName: "users", 
-  timestamps: true, 
+@Table({
+  tableName: "users",
+  timestamps: true,
   paranoid: true, // soft delete
-  underscored: true // snake_case en DB
+  underscored: true, // snake_case en DB
 })
 export class User extends Model<UserAttributes, UserCreationAttributes> {
   @PrimaryKey
@@ -68,9 +81,9 @@ export class User extends Model<UserAttributes, UserCreationAttributes> {
   @Column(DataType.STRING)
   declare email: string;
 
-  @AllowNull(false)
+  @AllowNull(true)
   @Column(DataType.STRING)
-  declare passwordHash: string;
+  declare passwordHash: string | null;
 
   @AllowNull(false)
   @Column(DataType.STRING(100))
@@ -93,6 +106,9 @@ export class User extends Model<UserAttributes, UserCreationAttributes> {
   @Default("customer")
   @Column(DataType.ENUM("admin", "staff", "customer"))
   declare role: UserRole;
+
+  @Column({ type: DataType.STRING(255), allowNull: true, unique: true })
+  declare googleSub: string | null;
 
   @Default(false)
   @Column(DataType.BOOLEAN)
@@ -125,7 +141,10 @@ export class User extends Model<UserAttributes, UserCreationAttributes> {
   @HasMany(() => Payment, { foreignKey: "userId", as: "payments" })
   declare payments?: Payment[];
 
-  @HasMany(() => ReservationPlayer, { foreignKey: "userId", as: "playerReservations" })
+  @HasMany(() => ReservationPlayer, {
+    foreignKey: "userId",
+    as: "playerReservations",
+  })
   declare playerReservations?: ReservationPlayer[];
 
   // Relacion 1:1 con Customer (legacy - mantener para compatibilidad)

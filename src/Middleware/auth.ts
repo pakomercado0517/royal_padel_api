@@ -81,6 +81,7 @@ export const authenticate = async (
           "role",
           "phone",
           "status",
+          "googleSub",
           "emailVerified",
           "phoneVerified",
           "avatarUrl",

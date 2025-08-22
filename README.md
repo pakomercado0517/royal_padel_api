@@ -12,6 +12,7 @@ API REST para la gestión de reservas de canchas de pádel, un sistema completo 
 - Nodemailer para emails transaccionales
 - Express Validator para validaciones
 - Bcrypt para encriptación
+- Google Auth Library (verificación de id_token) y Google Identity Services (client)
 
 ## 📦 Instalación
 
@@ -32,6 +33,8 @@ NODEMAILER_HOST=
 NODEMAILER_PASS=
 NODEMAILER_PORT=
 NODEMAILER_USER=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 PORT=
 
 # Iniciar en desarrollo
@@ -96,14 +99,15 @@ El sistema implementa una arquitectura robusta con los siguientes modelos:
 
 ### 🔐 Autenticación (/user)
 
-| Método | Ruta                   | Descripción                      | Payload Requerido                                                                                             |
-| ------ | ---------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| POST   | /create_account        | Crear cuenta y perfil de cliente | fullName, email, password, phone(opcional). Crea automáticamente el perfil de cliente si el rol es "customer" |
-| POST   | /confirm_account       | Confirmar cuenta                 | token(6 dígitos)                                                                                              |
-| POST   | /login                 | Iniciar sesión                   | email, password                                                                                               |
-| POST   | /forgot_password       | Recuperar contraseña             | email                                                                                                         |
-| POST   | /validate_token        | Validar token                    | token(6 dígitos)                                                                                              |
-| POST   | /reset_password/:token | Cambiar contraseña               | password, token(param)                                                                                        |
+| Método | Ruta                   | Descripción                              | Payload Requerido                                                                                             |
+| ------ | ---------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| POST   | /create_account        | Crear cuenta y perfil de cliente         | fullName, email, password, phone(opcional). Crea automáticamente el perfil de cliente si el rol es "customer" |
+| POST   | /confirm_account       | Confirmar cuenta                         | token(6 dígitos)                                                                                              |
+| POST   | /login                 | Iniciar sesión                           | email, password                                                                                               |
+| POST   | /forgot_password       | Recuperar contraseña                     | email                                                                                                         |
+| POST   | /validate_token        | Validar token                            | token(6 dígitos)                                                                                              |
+| POST   | /reset_password/:token | Cambiar contraseña                       | password, token(param)                                                                                        |
+| POST   | /googleAuth            | Iniciar sesión con Google (Code Flow)    | code (authorization code obtenido con GIS - ux_mode: 'popup', redirect_uri: 'postmessage')                    |
 
 ### 🔒 Seguridad
 
@@ -147,7 +151,7 @@ Las rutas incluyen validaciones para:
 
 ## 🔒 Autenticación
 
-El sistema utiliza JWT (JSON Web Tokens) para la autenticación de usuarios. El token debe incluirse en el header de las peticiones:
+El sistema utiliza JWT (JSON Web Tokens) para la autenticación de usuarios. El token debe incluirse en el header de las peticiones. Además, se soporta inicio de sesión con Google mediante Google Identity Services (Code Flow), intercambiando el authorization code por id_token y verificándolo con Google Auth Library.
 
 ```
 Authorization: Bearer <token>

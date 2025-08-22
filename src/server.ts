@@ -22,7 +22,7 @@ server.use(cookieParser());
 server.use(morgan("dev"));
 server.use(
   cors({
-    origin: "*",
+    origin: `${process.env.FRONTEND_URL}`,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })

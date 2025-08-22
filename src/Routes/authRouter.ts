@@ -182,4 +182,12 @@ router.post(
   }
 );
 
+//POST /googleAuth
+router.post(
+  "/googleAuth",
+  body("code").notEmpty().withMessage("El código no puede ir vacio"),
+  handleInputErrors,
+  authControllers.googleVerify
+);
+
 export default router;
